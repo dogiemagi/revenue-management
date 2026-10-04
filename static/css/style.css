@@ -892,6 +892,30 @@ textarea {
     transition: var(--transition);
 }
 
+/* Professional custom select — remove all OS/browser native styling */
+select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 2.4rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    cursor: pointer;
+}
+
+select:hover {
+    border-color: var(--primary);
+}
+
+select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    padding: 0.5rem;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -964,6 +988,191 @@ textarea:focus {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ================= EXPENSE FILTER PILLS ================= */
+.exp-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-full);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+
+.exp-filter-pill i { font-size: 0.75rem; }
+
+.exp-filter-pill:hover,
+.exp-filter-pill.active {
+    color: #fff;
+    border-color: transparent;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+
+/* Default "All" pill — indigo */
+.exp-filter-pill.active { background: var(--primary); }
+
+/* Per-category active/hover accent colours */
+.exp-filter-pill.cat-groceries:hover,
+.exp-filter-pill.cat-groceries.active    { background: #10b981; box-shadow: 0 3px 10px rgba(16,185,129,0.35); }
+
+.exp-filter-pill.cat-clothing:hover,
+.exp-filter-pill.cat-clothing.active     { background: #ec4899; box-shadow: 0 3px 10px rgba(236,72,153,0.35); }
+
+.exp-filter-pill.cat-dining:hover,
+.exp-filter-pill.cat-dining.active       { background: #f97316; box-shadow: 0 3px 10px rgba(249,115,22,0.35); }
+
+.exp-filter-pill.cat-utilities:hover,
+.exp-filter-pill.cat-utilities.active    { background: #f59e0b; box-shadow: 0 3px 10px rgba(245,158,11,0.35); }
+
+.exp-filter-pill.cat-housing:hover,
+.exp-filter-pill.cat-housing.active      { background: #0ea5e9; box-shadow: 0 3px 10px rgba(14,165,233,0.35); }
+
+.exp-filter-pill.cat-transportation:hover,
+.exp-filter-pill.cat-transportation.active { background: #64748b; box-shadow: 0 3px 10px rgba(100,116,139,0.35); }
+
+.exp-filter-pill.cat-healthcare:hover,
+.exp-filter-pill.cat-healthcare.active   { background: #f43f5e; box-shadow: 0 3px 10px rgba(244,63,94,0.35); }
+
+.exp-filter-pill.cat-other:hover,
+.exp-filter-pill.cat-other.active        { background: #14b8a6; box-shadow: 0 3px 10px rgba(20,184,166,0.35); }
+
+/* ================= EXPENSE TABLE CATEGORY BADGE ================= */
+.exp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ================= CATEGORY SELECTOR GRID ================= */
+.category-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.55rem;
+    margin-top: 0.25rem;
+}
+
+.cat-select-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.85rem 0.4rem 0.7rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    border: 1.5px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    user-select: none;
+}
+
+/* Icon circle badge */
+.cat-select-card .cat-icon-wrap {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(148, 163, 184, 0.1);
+    transition: all 0.2s ease;
+}
+
+.cat-select-card i {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.cat-select-card span {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.cat-select-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+/* Groceries — Emerald */
+.cat-select-card[data-cat="groceries"] .cat-icon-wrap { background: rgba(16,185,129,0.14); }
+.cat-select-card[data-cat="groceries"] i              { color: #10b981; }
+.cat-select-card[data-cat="groceries"].active         { border-color: #10b981; background: rgba(16,185,129,0.08); box-shadow: 0 0 0 3px rgba(16,185,129,0.18); }
+.cat-select-card[data-cat="groceries"].active span,
+.cat-select-card[data-cat="groceries"]:hover span     { color: #10b981; }
+
+/* Clothing — Pink */
+.cat-select-card[data-cat="clothing"] .cat-icon-wrap  { background: rgba(236,72,153,0.14); }
+.cat-select-card[data-cat="clothing"] i               { color: #ec4899; }
+.cat-select-card[data-cat="clothing"].active          { border-color: #ec4899; background: rgba(236,72,153,0.08); box-shadow: 0 0 0 3px rgba(236,72,153,0.18); }
+.cat-select-card[data-cat="clothing"].active span,
+.cat-select-card[data-cat="clothing"]:hover span      { color: #ec4899; }
+
+/* Dining — Orange */
+.cat-select-card[data-cat="dining"] .cat-icon-wrap    { background: rgba(249,115,22,0.14); }
+.cat-select-card[data-cat="dining"] i                 { color: #f97316; }
+.cat-select-card[data-cat="dining"].active            { border-color: #f97316; background: rgba(249,115,22,0.08); box-shadow: 0 0 0 3px rgba(249,115,22,0.18); }
+.cat-select-card[data-cat="dining"].active span,
+.cat-select-card[data-cat="dining"]:hover span        { color: #f97316; }
+
+/* Utilities — Amber */
+.cat-select-card[data-cat="utilities"] .cat-icon-wrap { background: rgba(245,158,11,0.14); }
+.cat-select-card[data-cat="utilities"] i              { color: #f59e0b; }
+.cat-select-card[data-cat="utilities"].active         { border-color: #f59e0b; background: rgba(245,158,11,0.08); box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+.cat-select-card[data-cat="utilities"].active span,
+.cat-select-card[data-cat="utilities"]:hover span     { color: #f59e0b; }
+
+/* Housing — Sky */
+.cat-select-card[data-cat="housing"] .cat-icon-wrap   { background: rgba(14,165,233,0.14); }
+.cat-select-card[data-cat="housing"] i                { color: #0ea5e9; }
+.cat-select-card[data-cat="housing"].active           { border-color: #0ea5e9; background: rgba(14,165,233,0.08); box-shadow: 0 0 0 3px rgba(14,165,233,0.18); }
+.cat-select-card[data-cat="housing"].active span,
+.cat-select-card[data-cat="housing"]:hover span       { color: #0ea5e9; }
+
+/* Transport — Slate */
+.cat-select-card[data-cat="transportation"] .cat-icon-wrap { background: rgba(100,116,139,0.14); }
+.cat-select-card[data-cat="transportation"] i              { color: #94a3b8; }
+.cat-select-card[data-cat="transportation"].active         { border-color: #94a3b8; background: rgba(100,116,139,0.08); box-shadow: 0 0 0 3px rgba(100,116,139,0.18); }
+.cat-select-card[data-cat="transportation"].active span,
+.cat-select-card[data-cat="transportation"]:hover span     { color: #94a3b8; }
+
+/* Healthcare — Rose */
+.cat-select-card[data-cat="healthcare"] .cat-icon-wrap { background: rgba(244,63,94,0.14); }
+.cat-select-card[data-cat="healthcare"] i              { color: #f43f5e; }
+.cat-select-card[data-cat="healthcare"].active         { border-color: #f43f5e; background: rgba(244,63,94,0.08); box-shadow: 0 0 0 3px rgba(244,63,94,0.18); }
+.cat-select-card[data-cat="healthcare"].active span,
+.cat-select-card[data-cat="healthcare"]:hover span     { color: #f43f5e; }
+
+/* Other — Teal */
+.cat-select-card[data-cat="other"] .cat-icon-wrap { background: rgba(20,184,166,0.14); }
+.cat-select-card[data-cat="other"] i              { color: #14b8a6; }
+.cat-select-card[data-cat="other"].active         { border-color: #14b8a6; background: rgba(20,184,166,0.08); box-shadow: 0 0 0 3px rgba(20,184,166,0.18); }
+.cat-select-card[data-cat="other"].active span,
+.cat-select-card[data-cat="other"]:hover span     { color: #14b8a6; }
+
+/* Active icon pop */
+.cat-select-card.active i { filter: brightness(1.15); }
+.cat-select-card.active .cat-icon-wrap { transform: scale(1.1); }
 
 /* ================= RESPONSIVE ================= */
 .mobile-only {

@@ -139,8 +139,18 @@
             </div>
             <a href="{{ url_for('records') }}" class="btn btn-outline btn-sm">All Records</a>
         </div>
-        <div class="chart-container" style="position: relative; height: 260px;">
+        <div class="chart-container" style="position: relative; height: 260px;" id="netHistoryContainer">
             <canvas id="netHistoryLineChart"></canvas>
+            <div id="netHistoryEmptyState" style="display: none; height: 100%; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.5rem 1rem;">
+                <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(99, 102, 241, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem;">
+                    <i class="fa-solid fa-chart-line" style="font-size: 1.25rem; color: var(--primary);"></i>
+                </div>
+                <h4 style="margin: 0 0 0.3rem 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 600;">No Pay Slips Recorded Yet</h4>
+                <p style="margin: 0 0 1rem 0; font-size: 0.8rem; color: var(--text-muted); max-width: 270px; line-height: 1.4;">Add your actual salary slips to track your take-home pay history over time.</p>
+                <button class="btn btn-primary btn-sm" onclick="openModal('addSlipModal')">
+                    <i class="fa-solid fa-plus"></i> Add First Pay Slip
+                </button>
+            </div>
         </div>
     </div>
 

@@ -155,21 +155,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Historical Net Revenue Line Chart
     // -------------------------------------------------------------
     const lineCtx = document.getElementById('netHistoryLineChart');
+    const emptyStateElem = document.getElementById('netHistoryEmptyState');
     if (lineCtx) {
         fetch('/api/personal-chart-data')
             .then(res => res.json())
             .then(data => {
                 const history = data.history;
                 if (!history || !history.labels || history.labels.length === 0) {
-                    // Fallback to sample trend
-                    renderHistoryLineChart(['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'],
-                                           [6800, 7100, 7100, 8900, 7770, 7770]);
+                    // Show friendly empty state instead of fake dummy numbers
+                    lineCtx.style.display = 'none';
+                    if (emptyStateElem) emptyStateElem.style.display = 'flex';
                     return;
                 }
+                lineCtx.style.display = 'block';
+                if (emptyStateElem) emptyStateElem.style.display = 'none';
                 renderHistoryLineChart(history.labels, history.net);
             })
             .catch(() => {
-                renderHistoryLineChart(['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'], [6800, 7100, 7100, 8900, 7770, 7770]);
+                lineCtx.style.display = 'none';
+                if (emptyStateElem) emptyStateElem.style.display = 'flex';
             });
     }
 

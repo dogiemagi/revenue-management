@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     backgroundColor: [
                         '#10b981', // Groceries (Emerald)
                         '#ec4899', // Clothing (Pink)
-                        '#8b5cf6', // Other Purchases (Purple)
+                        '#14b8a6', // Other Purchases (Teal)
                         '#0ea5e9', // Utilities (Sky)
                         '#f59e0b', // Dining (Amber)
                         '#6366f1'  // Transportation (Indigo)

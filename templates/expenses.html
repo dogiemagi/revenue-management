@@ -97,8 +97,8 @@
                 <div style="font-size: 0.7rem; color: var(--text-muted);">{{ exp_summary.category_percentages.clothing }}% of total</div>
             </div>
             <div style="background: var(--bg-input); padding: 0.5rem; border-radius: var(--radius-sm);">
-                <div style="font-size: 0.75rem; color: var(--text-muted);"><i class="fa-solid fa-bag-shopping" style="color: #8b5cf6;"></i> Other Purchases</div>
-                <div style="font-weight: 700; color: #8b5cf6;">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.other) }}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);"><i class="fa-solid fa-bag-shopping" style="color: #14b8a6;"></i> Other Purchases</div>
+                <div style="font-weight: 700; color: #14b8a6;">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.other) }}</div>
                 <div style="font-size: 0.7rem; color: var(--text-muted);">{{ exp_summary.category_percentages.other }}% of total</div>
             </div>
         </div>
@@ -125,15 +125,36 @@
 <!-- Expense Records Table & Filter -->
 <div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
     <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
-        <!-- Category Filter Pills -->
-        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-right: 0.25rem;">Filter Category:</span>
-            <a href="{{ url_for('expenses_view', category='all') }}" class="pill-btn-sm {% if category_filter == 'all' %}active{% endif %}">All</a>
-            <a href="{{ url_for('expenses_view', category='groceries') }}" class="pill-btn-sm {% if category_filter == 'groceries' %}active{% endif %}"><i class="fa-solid fa-basket-shopping"></i> Groceries</a>
-            <a href="{{ url_for('expenses_view', category='clothing') }}" class="pill-btn-sm {% if category_filter == 'clothing' %}active{% endif %}"><i class="fa-solid fa-shirt"></i> Clothes</a>
-            <a href="{{ url_for('expenses_view', category='other') }}" class="pill-btn-sm {% if category_filter == 'other' %}active{% endif %}"><i class="fa-solid fa-bag-shopping"></i> Other Purchases</a>
-            <a href="{{ url_for('expenses_view', category='utilities') }}" class="pill-btn-sm {% if category_filter == 'utilities' %}active{% endif %}"><i class="fa-solid fa-bolt"></i> Utilities</a>
-            <a href="{{ url_for('expenses_view', category='dining') }}" class="pill-btn-sm {% if category_filter == 'dining' %}active{% endif %}"><i class="fa-solid fa-utensils"></i> Dining</a>
+        <!-- Category Filter Pills (JS client-side — no page reload) -->
+        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;" id="expFilterBar">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 0.3rem;">Filter:</span>
+            <button class="exp-filter-pill active" data-filter="all" onclick="filterExpenses('all', this)">
+                <i class="fa-solid fa-border-all"></i> All
+            </button>
+            <button class="exp-filter-pill cat-groceries" data-filter="groceries" onclick="filterExpenses('groceries', this)">
+                <i class="fa-solid fa-basket-shopping"></i> Groceries
+            </button>
+            <button class="exp-filter-pill cat-clothing" data-filter="clothing" onclick="filterExpenses('clothing', this)">
+                <i class="fa-solid fa-shirt"></i> Clothing
+            </button>
+            <button class="exp-filter-pill cat-dining" data-filter="dining" onclick="filterExpenses('dining', this)">
+                <i class="fa-solid fa-utensils"></i> Dining
+            </button>
+            <button class="exp-filter-pill cat-utilities" data-filter="utilities" onclick="filterExpenses('utilities', this)">
+                <i class="fa-solid fa-bolt-lightning"></i> Utilities
+            </button>
+            <button class="exp-filter-pill cat-housing" data-filter="housing" onclick="filterExpenses('housing', this)">
+                <i class="fa-solid fa-house"></i> Housing
+            </button>
+            <button class="exp-filter-pill cat-transportation" data-filter="transportation" onclick="filterExpenses('transportation', this)">
+                <i class="fa-solid fa-car-side"></i> Transport
+            </button>
+            <button class="exp-filter-pill cat-healthcare" data-filter="healthcare" onclick="filterExpenses('healthcare', this)">
+                <i class="fa-solid fa-heart-pulse"></i> Healthcare
+            </button>
+            <button class="exp-filter-pill cat-other" data-filter="other" onclick="filterExpenses('other', this)">
+                <i class="fa-solid fa-bag-shopping"></i> Other
+            </button>
         </div>
 
         <!-- Add Expense CTA Button -->
@@ -146,7 +167,7 @@
 <!-- Detailed Table of Expenses -->
 <div class="card">
     <div class="table-responsive">
-        <table class="custom-table">
+        <table class="custom-table" id="expenseTable">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -157,9 +178,9 @@
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="expenseTableBody">
                 {% for exp in expenses %}
-                <tr>
+                <tr data-cat="{{ exp.category }}">
                     <td>
                         <span style="font-weight: 600; color: var(--text-primary);">{{ exp.expense_date.strftime('%d %b %Y') }}</span>
                     </td>
@@ -171,17 +192,23 @@
                     </td>
                     <td>
                         {% if exp.category == 'groceries' %}
-                        <span class="badge badge-success"><i class="fa-solid fa-basket-shopping"></i> Groceries</span>
+                        <span class="exp-badge" style="background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.25);"><i class="fa-solid fa-basket-shopping"></i> Groceries</span>
                         {% elif exp.category == 'clothing' %}
-                        <span class="badge" style="background: rgba(236, 72, 153, 0.15); color: #f472b6;"><i class="fa-solid fa-shirt"></i> Clothes</span>
-                        {% elif exp.category == 'other' %}
-                        <span class="badge badge-primary"><i class="fa-solid fa-bag-shopping"></i> Other</span>
-                        {% elif exp.category == 'utilities' %}
-                        <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8;"><i class="fa-solid fa-bolt"></i> Utilities</span>
+                        <span class="exp-badge" style="background:rgba(236,72,153,0.12);color:#ec4899;border:1px solid rgba(236,72,153,0.25);"><i class="fa-solid fa-shirt"></i> Clothing</span>
                         {% elif exp.category == 'dining' %}
-                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i class="fa-solid fa-utensils"></i> Dining</span>
+                        <span class="exp-badge" style="background:rgba(249,115,22,0.12);color:#f97316;border:1px solid rgba(249,115,22,0.25);"><i class="fa-solid fa-utensils"></i> Dining</span>
+                        {% elif exp.category == 'utilities' %}
+                        <span class="exp-badge" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);"><i class="fa-solid fa-bolt-lightning"></i> Utilities</span>
+                        {% elif exp.category == 'housing' %}
+                        <span class="exp-badge" style="background:rgba(14,165,233,0.12);color:#0ea5e9;border:1px solid rgba(14,165,233,0.25);"><i class="fa-solid fa-house"></i> Housing</span>
+                        {% elif exp.category == 'transportation' %}
+                        <span class="exp-badge" style="background:rgba(100,116,139,0.12);color:#94a3b8;border:1px solid rgba(100,116,139,0.25);"><i class="fa-solid fa-car-side"></i> Transport</span>
+                        {% elif exp.category == 'healthcare' %}
+                        <span class="exp-badge" style="background:rgba(244,63,94,0.12);color:#f43f5e;border:1px solid rgba(244,63,94,0.25);"><i class="fa-solid fa-heart-pulse"></i> Healthcare</span>
+                        {% elif exp.category == 'other' %}
+                        <span class="exp-badge" style="background:rgba(20,184,166,0.12);color:#14b8a6;border:1px solid rgba(20,184,166,0.25);"><i class="fa-solid fa-bag-shopping"></i> Other</span>
                         {% else %}
-                        <span class="badge badge-subtle">{{ exp.category.title() }}</span>
+                        <span class="exp-badge" style="background:var(--bg-input);color:var(--text-secondary);"><i class="fa-solid fa-tag"></i> {{ exp.category.replace('_',' ').title() }}</span>
                         {% endif %}
                     </td>
                     <td>
@@ -201,32 +228,106 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr>
+                <tr id="noDataRow">
                     <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-                        <i class="fa-solid fa-cart-shopping" style="font-size: 2.5rem; margin-bottom: 0.75rem; display: block; opacity: 0.6;"></i>
-                        No expense records logged yet. Click <strong>Add New Expense</strong> to record groceries, clothes, or other purchases!
+                        <i class="fa-solid fa-cart-shopping" style="font-size: 2.5rem; margin-bottom: 0.75rem; display: block; opacity: 0.4;"></i>
+                        No expense records logged yet. Click <strong>Add New Expense</strong> to get started!
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        <!-- JS-injected no-results row -->
+        <div id="filterEmptyState" style="display:none; text-align:center; padding:3rem; color:var(--text-muted);">
+            <i class="fa-solid fa-filter-circle-xmark" style="font-size:2.5rem; margin-bottom:0.75rem; display:block; opacity:0.4;"></i>
+            No expenses found for this category.
+        </div>
     </div>
 </div>
+
+<script>
+// ── Client-side instant expense filter (no page reload) ──
+function filterExpenses(cat, btnEl) {
+    // Update active pill
+    document.querySelectorAll('#expFilterBar .exp-filter-pill').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+
+    const rows = document.querySelectorAll('#expenseTableBody tr[data-cat]');
+    let visible = 0;
+    rows.forEach(row => {
+        const match = cat === 'all' || row.dataset.cat === cat;
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+
+    // Show / hide empty state
+    const emptyState = document.getElementById('filterEmptyState');
+    if (emptyState) emptyState.style.display = visible === 0 && rows.length > 0 ? 'block' : 'none';
+}
+</script>
 
 <!-- ================= ADD EXPENSE MODAL ================= -->
 <div class="modal-overlay" id="addExpenseModal">
     <div class="modal-dialog">
         <div class="modal-header">
             <div class="modal-title-group">
-                <div class="modal-icon" style="background: rgba(244, 63, 94, 0.15); color: var(--danger);"><i class="fa-solid fa-cart-plus"></i></div>
-                <h3>Add New Expense</h3>
+                <div class="modal-icon" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15)); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.25);">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 700;">Record Expenditure</h3>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">Track groceries, clothing, or other household purchases</p>
+                </div>
             </div>
             <button class="modal-close-btn" onclick="closeModal('addExpenseModal')">&times;</button>
         </div>
         <form action="{{ url_for('add_expense') }}" method="POST" class="modal-form">
+            <!-- Visual Category Selector Grid -->
+            <div class="form-group">
+                <label style="margin-bottom: 0.35rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Expense Category</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Select category</span>
+                </label>
+                <div class="category-selector-grid" id="expenseCatGrid">
+                    <div class="cat-select-card active" data-cat="groceries" onclick="selectExpenseCategory(this, 'groceries')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-basket-shopping"></i></div>
+                        <span>Groceries</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="clothing" onclick="selectExpenseCategory(this, 'clothing')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-shirt"></i></div>
+                        <span>Clothing</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="dining" onclick="selectExpenseCategory(this, 'dining')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-utensils"></i></div>
+                        <span>Dining</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="utilities" onclick="selectExpenseCategory(this, 'utilities')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-bolt-lightning"></i></div>
+                        <span>Utilities</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="housing" onclick="selectExpenseCategory(this, 'housing')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-house"></i></div>
+                        <span>Housing</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="transportation" onclick="selectExpenseCategory(this, 'transportation')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-car-side"></i></div>
+                        <span>Transport</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="healthcare" onclick="selectExpenseCategory(this, 'healthcare')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-heart-pulse"></i></div>
+                        <span>Healthcare</span>
+                    </div>
+                    <div class="cat-select-card" data-cat="other" onclick="selectExpenseCategory(this, 'other')">
+                        <div class="cat-icon-wrap"><i class="fa-solid fa-bag-shopping"></i></div>
+                        <span>Other</span>
+                    </div>
+                </div>
+                <input type="hidden" id="exp_category" name="category" value="groceries">
+            </div>
+
             <div class="form-row">
                 <div class="form-group col-8">
-                    <label for="exp_title">Expense Title / Item</label>
+                    <label for="exp_title">Expense Description / Item</label>
                     <input type="text" id="exp_title" name="title" placeholder="e.g. Weekly Supermarket Groceries, Winter Jacket" required>
                 </div>
                 <div class="form-group col-4">
@@ -236,26 +337,14 @@
             </div>
 
             <div class="form-row">
-                <div class="form-group col-4">
-                    <label for="exp_category">Category</label>
-                    <select id="exp_category" name="category" required>
-                        <option value="groceries" selected>🛒 Groceries</option>
-                        <option value="clothing">👕 Clothes / Apparel</option>
-                        <option value="other">🛍️ Other Purchases</option>
-                        <option value="utilities">⚡ Utilities & Bills</option>
-                        <option value="dining">🍽️ Dining & Food</option>
-                        <option value="housing">🏠 Rent / Housing</option>
-                        <option value="transportation">🚗 Transportation</option>
-                    </select>
-                </div>
-                <div class="form-group col-4">
+                <div class="form-group col-6">
                     <label for="exp_date">Date of Purchase</label>
                     <input type="date" id="exp_date" name="expense_date" value="{{ now.strftime('%Y-%m-%d') }}" required>
                 </div>
-                <div class="form-group col-4">
+                <div class="form-group col-6">
                     <label for="exp_recurrence">Cadence / Recurrence</label>
                     <select id="exp_recurrence" name="recurrence">
-                        <option value="one_time">One-Time</option>
+                        <option value="one_time">One-Time Expense</option>
                         <option value="weekly">Weekly Recurring</option>
                         <option value="monthly" selected>Monthly Recurring</option>
                         <option value="yearly">Yearly Recurring</option>
@@ -270,11 +359,18 @@
 
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('addExpenseModal')">Cancel</button>
-                <button type="submit" class="btn btn-danger" style="background: var(--danger);"><i class="fa-solid fa-plus"></i> Save Expense</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Expense</button>
             </div>
         </form>
     </div>
 </div>
+<script>
+    function selectExpenseCategory(el, category) {
+        document.querySelectorAll('#expenseCatGrid .cat-select-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('exp_category').value = category;
+    }
+</script>
 
 <!-- Embedded Data for Chart.js -->
 <script id="expense-summary-data" type="application/json">
