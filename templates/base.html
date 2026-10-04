@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}RevTrack — Revenue & Salary Management{% endblock %}</title>
+    <title>{% block title %}RevTrack — Revenue & Expense Management{% endblock %}</title>
     <!-- Google Fonts: Inter & Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@
                     </div>
                     <div class="brand-text">
                         <span class="brand-title">RevTrack</span>
-                        <span class="brand-subtitle">Revenue Intelligence</span>
+                        <span class="brand-subtitle">Salary & Expenses</span>
                     </div>
                 </a>
                 <button class="sidebar-toggle-btn mobile-only" id="sidebarCloseBtn" aria-label="Close Sidebar">
@@ -55,7 +55,7 @@
 
             <!-- Main Navigation Links -->
             <nav class="sidebar-nav">
-                <div class="nav-section-title">Navigation</div>
+                <div class="nav-section-title">Salary & Income</div>
                 <ul class="nav-list">
                     <li class="nav-item">
                         <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
@@ -89,12 +89,29 @@
                     </li>
                 </ul>
 
-                <div class="nav-section-title">Actions & Exports</div>
+                <div class="nav-section-title">Expenses & Spending</div>
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="{{ url_for('expenses_view') }}" class="nav-link {% if request.endpoint == 'expenses_view' %}active{% endif %}">
+                            <i class="fa-solid fa-basket-shopping text-accent"></i>
+                            <span>Expense Management</span>
+                            <span class="badge" style="background: rgba(244, 63, 94, 0.15); color: var(--danger);">Groceries & Clothes</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="nav-section-title">Quick Actions</div>
                 <ul class="nav-list">
                     <li class="nav-item">
                         <a href="javascript:void(0)" class="nav-link" onclick="openModal('addSlipModal')">
                             <i class="fa-solid fa-circle-plus text-accent"></i>
                             <span>Add Salary Record</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="javascript:void(0)" class="nav-link" onclick="openModal('quickExpenseModal')">
+                            <i class="fa-solid fa-cart-plus" style="color: var(--danger);"></i>
+                            <span>Log Expense / Purchase</span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -114,7 +131,7 @@
                     </div>
                     <div class="user-info">
                         <div class="user-name">{{ current_user.name }}</div>
-                        <div class="user-meta">{{ current_user.job_title }}</div>
+                        <div class="user-meta">{{ current_user.job_title }} · <strong>{{ current_user.currency }}</strong></div>
                     </div>
                     <button class="settings-trigger-btn" title="Salary Settings">
                         <i class="fa-solid fa-gear"></i>
@@ -135,7 +152,7 @@
 
         <!-- Main Workspace -->
         <main class="main-content {% if not current_user %}no-sidebar{% endif %}">
-            <!-- Top Navbar for Mobile & Header Actions -->
+            <!-- Top Navbar -->
             <header class="top-navbar">
                 {% if current_user %}
                 <button class="mobile-nav-toggle mobile-only" id="sidebarOpenBtn" aria-label="Open Sidebar">
@@ -156,13 +173,25 @@
 
                 <div class="navbar-actions">
                     {% if current_user %}
-                    <button class="btn btn-outline btn-sm" onclick="openModal('addSlipModal')">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>New Pay Slip</span>
+                    <!-- Quick Currency Switcher Form -->
+                    <form action="{{ url_for('switch_currency') }}" method="POST" style="display: inline-flex; align-items: center; margin-right: 0.5rem;">
+                        <select name="currency" onchange="this.form.submit()" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; font-weight: 700; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--primary); cursor: pointer;" title="Change Currency Format">
+                            <option value="₹" {% if current_user.currency == '₹' %}selected{% endif %}>₹ INR (Rupees)</option>
+                            <option value="$" {% if current_user.currency == '$' %}selected{% endif %}>$ USD (Dollar)</option>
+                            <option value="€" {% if current_user.currency == '€' %}selected{% endif %}>€ EUR (Euro)</option>
+                            <option value="£" {% if current_user.currency == '£' %}selected{% endif %}>£ GBP (Pound)</option>
+                            <option value="C$" {% if current_user.currency == 'C$' %}selected{% endif %}>C$ CAD (Canada)</option>
+                            <option value="A$" {% if current_user.currency == 'A$' %}selected{% endif %}>A$ AUD (Australia)</option>
+                        </select>
+                    </form>
+
+                    <button class="btn btn-outline btn-sm" onclick="openModal('quickExpenseModal')" style="border-color: rgba(244, 63, 94, 0.4); color: var(--danger);">
+                        <i class="fa-solid fa-basket-shopping"></i>
+                        <span>+ Expense</span>
                     </button>
-                    <button class="btn btn-primary btn-sm" onclick="openModal('profileSettingsModal')">
-                        <i class="fa-solid fa-sliders"></i>
-                        <span>Salary Settings</span>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('addSlipModal')">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>+ Pay Slip</span>
                     </button>
                     {% else %}
                     <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm">Sign In</a>
@@ -204,11 +233,11 @@
             <!-- Footer -->
             <footer class="app-footer">
                 <div class="footer-left">
-                    <span>&copy; {{ current_year }} RevTrack — Professional Revenue & Salary Management</span>
+                    <span>&copy; {{ current_year }} RevTrack — Professional Salary & Expense Management</span>
                 </div>
                 <div class="footer-right">
+                    <span class="tech-badge"><i class="fa-solid fa-indian-rupee-sign"></i> Multi-Currency (INR ₹ Supported)</span>
                     <span class="tech-badge"><i class="fa-brands fa-python"></i> Python & Flask</span>
-                    <span class="tech-badge"><i class="fa-solid fa-database"></i> SQLite / PostgreSQL</span>
                     <span class="tech-badge"><i class="fa-solid fa-cloud"></i> Render Ready</span>
                 </div>
             </footer>
@@ -230,7 +259,7 @@
                 <div class="form-row">
                     <div class="form-group col-8">
                         <label for="record_title">Title / Description</label>
-                        <input type="text" id="record_title" name="title" placeholder="e.g. October 2026 Salary, Freelance Sprint" required>
+                        <input type="text" id="record_title" name="title" placeholder="e.g. October 2026 Salary, Freelance Milestone" required>
                     </div>
                     <div class="form-group col-4">
                         <label for="record_category">Category</label>
@@ -268,7 +297,7 @@
                 <div class="form-row">
                     <div class="form-group col-6">
                         <label for="record_gross">Base Gross Salary</label>
-                        <input type="number" step="0.01" id="record_gross" name="gross_amount" placeholder="0.00" value="{{ current_user.profile.base_salary if current_user.profile else 5000.0 }}" required>
+                        <input type="number" step="0.01" id="record_gross" name="gross_amount" placeholder="0.00" value="{{ current_user.profile.base_salary if current_user.profile else 75000.0 }}" required>
                     </div>
                     <div class="form-group col-6">
                         <label for="record_allowances">Allowances / HRA / Perks</label>
@@ -286,7 +315,7 @@
                         <input type="number" step="0.01" id="record_tax" name="tax_deduction" placeholder="0.00">
                     </div>
                     <div class="form-group col-3">
-                        <label for="record_pension">Pension / 401k</label>
+                        <label for="record_pension">Pension / EPF</label>
                         <input type="number" step="0.01" id="record_pension" name="pension_deduction" placeholder="0.00">
                     </div>
                     <div class="form-group col-3">
@@ -312,6 +341,69 @@
         </div>
     </div>
 
+    <!-- ================= QUICK EXPENSE MODAL ================= -->
+    <div class="modal-overlay" id="quickExpenseModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon" style="background: rgba(244, 63, 94, 0.15); color: var(--danger);"><i class="fa-solid fa-basket-shopping"></i></div>
+                    <h3>Log Expense / Purchase</h3>
+                </div>
+                <button class="modal-close-btn" onclick="closeModal('quickExpenseModal')">&times;</button>
+            </div>
+            <form action="{{ url_for('add_expense') }}" method="POST" class="modal-form">
+                <div class="form-row">
+                    <div class="form-group col-8">
+                        <label for="modal_exp_title">Expense Title / Item</label>
+                        <input type="text" id="modal_exp_title" name="title" placeholder="e.g. Weekly Groceries, Clothing Haul, Gadget" required>
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="modal_exp_amount">Amount ({{ current_user.currency }})</label>
+                        <input type="number" step="0.01" id="modal_exp_amount" name="amount" placeholder="0.00" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-4">
+                        <label for="modal_exp_cat">Category</label>
+                        <select id="modal_exp_cat" name="category" required>
+                            <option value="groceries" selected>🛒 Groceries</option>
+                            <option value="clothing">👕 Clothes / Apparel</option>
+                            <option value="other">🛍️ Other Purchases</option>
+                            <option value="utilities">⚡ Utilities & Bills</option>
+                            <option value="dining">🍽️ Dining & Food</option>
+                            <option value="housing">🏠 Rent / Housing</option>
+                            <option value="transportation">🚗 Transportation</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="modal_exp_date">Date</label>
+                        <input type="date" id="modal_exp_date" name="expense_date" value="{{ now.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="modal_exp_rec">Recurrence</label>
+                        <select id="modal_exp_rec" name="recurrence">
+                            <option value="one_time">One-Time</option>
+                            <option value="weekly">Weekly Recurring</option>
+                            <option value="monthly" selected>Monthly Recurring</option>
+                            <option value="yearly">Yearly Recurring</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal_exp_notes">Notes (Optional)</label>
+                    <textarea id="modal_exp_notes" name="notes" rows="2" placeholder="Store name, receipt notes, item details..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('quickExpenseModal')">Cancel</button>
+                    <button type="submit" class="btn btn-danger" style="background: var(--danger);"><i class="fa-solid fa-plus"></i> Save Expense</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- ================= SALARY PROFILE SETTINGS MODAL ================= -->
     <div class="modal-overlay" id="profileSettingsModal">
         <div class="modal-dialog">
@@ -328,19 +420,19 @@
                         <label for="user_name">Full Name</label>
                         <input type="text" id="user_name" name="name" value="{{ current_user.name }}" required>
                     </div>
-                    <div class="form-group col-5">
+                    <div class="form-group col-4">
                         <label for="job_title">Job Title</label>
                         <input type="text" id="job_title" name="job_title" value="{{ current_user.job_title }}" required>
                     </div>
-                    <div class="form-group col-3">
-                        <label for="currency_select">Currency</label>
+                    <div class="form-group col-4">
+                        <label for="currency_select">Currency Preference</label>
                         <select id="currency_select" name="currency">
-                            <option value="$" {% if current_user.currency == '$' %}selected{% endif %}>USD ($)</option>
-                            <option value="₹" {% if current_user.currency == '₹' %}selected{% endif %}>INR (₹)</option>
-                            <option value="€" {% if current_user.currency == '€' %}selected{% endif %}>EUR (€)</option>
-                            <option value="£" {% if current_user.currency == '£' %}selected{% endif %}>GBP (£)</option>
-                            <option value="C$" {% if current_user.currency == 'C$' %}selected{% endif %}>CAD ($)</option>
-                            <option value="A$" {% if current_user.currency == 'A$' %}selected{% endif %}>AUD ($)</option>
+                            <option value="₹" {% if current_user.currency == '₹' %}selected{% endif %}>₹ INR (Indian Rupee)</option>
+                            <option value="$" {% if current_user.currency == '$' %}selected{% endif %}>$ USD (US Dollar)</option>
+                            <option value="€" {% if current_user.currency == '€' %}selected{% endif %}>€ EUR (Euro)</option>
+                            <option value="£" {% if current_user.currency == '£' %}selected{% endif %}>£ GBP (British Pound)</option>
+                            <option value="C$" {% if current_user.currency == 'C$' %}selected{% endif %}>C$ CAD (Canadian Dollar)</option>
+                            <option value="A$" {% if current_user.currency == 'A$' %}selected{% endif %}>A$ AUD (Australian Dollar)</option>
                         </select>
                     </div>
                 </div>
@@ -360,18 +452,18 @@
                         </select>
                     </div>
                     <div class="form-group col-6">
-                        <label for="prof_base">Base Salary Amount</label>
+                        <label for="prof_base">Base Salary Amount ({{ current_user.currency }})</label>
                         <input type="number" step="0.01" id="prof_base" name="base_salary" value="{{ current_user.profile.base_salary }}" required>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group col-6">
-                        <label for="prof_allowances">Allowances / HRA</label>
+                        <label for="prof_allowances">Allowances / HRA ({{ current_user.currency }})</label>
                         <input type="number" step="0.01" id="prof_allowances" name="allowances" value="{{ current_user.profile.allowances }}">
                     </div>
                     <div class="form-group col-6">
-                        <label for="prof_bonus">Target Expected Bonus</label>
+                        <label for="prof_bonus">Target Expected Bonus ({{ current_user.currency }})</label>
                         <input type="number" step="0.01" id="prof_bonus" name="bonus_expected" value="{{ current_user.profile.bonus_expected }}">
                     </div>
                 </div>
@@ -386,25 +478,25 @@
                         <input type="number" step="0.1" id="prof_tax" name="tax_rate" value="{{ current_user.profile.tax_rate }}">
                     </div>
                     <div class="form-group col-6">
-                        <label for="prof_pension">Pension / 401(k) / PF Rate (%)</label>
+                        <label for="prof_pension">Pension / EPF / 401(k) Rate (%)</label>
                         <input type="number" step="0.1" id="prof_pension" name="pension_rate" value="{{ current_user.profile.pension_rate }}">
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group col-6">
-                        <label for="prof_insurance">Insurance Deduction (Fixed)</label>
+                        <label for="prof_insurance">Insurance Deduction (Fixed {{ current_user.currency }})</label>
                         <input type="number" step="0.01" id="prof_insurance" name="insurance_deduction" value="{{ current_user.profile.insurance_deduction }}">
                     </div>
                     <div class="form-group col-6">
-                        <label for="prof_other">Other Deductions (Fixed)</label>
+                        <label for="prof_other">Other Deductions (Fixed {{ current_user.currency }})</label>
                         <input type="number" step="0.01" id="prof_other" name="other_deductions" value="{{ current_user.profile.other_deductions }}">
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeModal('profileSettingsModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Profile</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Preferences</button>
                 </div>
             </form>
         </div>

@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Expense & Spending Management — RevTrack{% endblock %}
+
+{% block page_heading %}
+<div class="page-title-box">
+    <h2>Expense & Spending Management</h2>
+    <span class="page-subtitle">Track Groceries, Clothes, and Purchases vs. Your Salary · {{ user.currency }} Currency</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Top Multi-Horizon Expense KPI Metrics -->
+<div class="kpi-grid">
+    <!-- Weekly Spending -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Weekly Spending</span>
+            <div class="kpi-icon-wrap info">
+                <i class="fa-solid fa-calendar-week"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.total_weekly) }}</div>
+        <div class="kpi-meta">
+            <span>Average 7-day budget outflow</span>
+        </div>
+    </div>
+
+    <!-- Monthly Spending -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Monthly Total Expenses</span>
+            <div class="kpi-icon-wrap danger">
+                <i class="fa-solid fa-receipt"></i>
+            </div>
+        </div>
+        <div class="kpi-value" style="color: var(--danger);">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.total_monthly) }}</div>
+        <div class="kpi-meta">
+            <span>Groceries: {{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.groceries) }}</span>
+            <span>· Clothes: {{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.clothing) }}</span>
+        </div>
+    </div>
+
+    <!-- Annual Projected Expenses -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Annual Spending Run-rate</span>
+            <div class="kpi-icon-wrap warning">
+                <i class="fa-solid fa-money-bill-transfer"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.total_yearly) }}</div>
+        <div class="kpi-meta">
+            <span>12-month projected living cost</span>
+        </div>
+    </div>
+
+    <!-- Net Monthly Savings (Salary - Expenses) -->
+    <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.35);">
+        <div class="kpi-top">
+            <span class="kpi-title">Net Monthly Savings</span>
+            <div class="kpi-icon-wrap success">
+                <i class="fa-solid fa-piggy-bank"></i>
+            </div>
+        </div>
+        <div class="kpi-value" style="color: var(--success);">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.monthly_savings) }}</div>
+        <div class="kpi-meta">
+            <span class="trend-up"><i class="fa-solid fa-seedling"></i> {{ exp_summary.savings_rate }}%</span>
+            <span>of Take-Home Saved</span>
+        </div>
+    </div>
+</div>
+
+<!-- Visualizations Grid -->
+<div class="grid-2">
+    <!-- Chart 1: Expense Category Distribution Donut (Groceries, Clothes, Other) -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Spending Habits by Category</h3>
+                <p class="card-subtitle">Distribution of Groceries, Clothing, and Purchases</p>
+            </div>
+            <span class="badge badge-primary">Categorized</span>
+        </div>
+        <div class="chart-container" style="position: relative; height: 280px;">
+            <canvas id="expenseCategoryDonutChart"></canvas>
+        </div>
+        <div class="category-breakdown-legend" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 1rem; text-align: center;">
+            <div style="background: var(--bg-input); padding: 0.5rem; border-radius: var(--radius-sm);">
+                <div style="font-size: 0.75rem; color: var(--text-muted);"><i class="fa-solid fa-basket-shopping" style="color: #10b981;"></i> Groceries</div>
+                <div style="font-weight: 700; color: #10b981;">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.groceries) }}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">{{ exp_summary.category_percentages.groceries }}% of total</div>
+            </div>
+            <div style="background: var(--bg-input); padding: 0.5rem; border-radius: var(--radius-sm);">
+                <div style="font-size: 0.75rem; color: var(--text-muted);"><i class="fa-solid fa-shirt" style="color: #ec4899;"></i> Clothing</div>
+                <div style="font-weight: 700; color: #ec4899;">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.clothing) }}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">{{ exp_summary.category_percentages.clothing }}% of total</div>
+            </div>
+            <div style="background: var(--bg-input); padding: 0.5rem; border-radius: var(--radius-sm);">
+                <div style="font-size: 0.75rem; color: var(--text-muted);"><i class="fa-solid fa-bag-shopping" style="color: #8b5cf6;"></i> Other Purchases</div>
+                <div style="font-weight: 700; color: #8b5cf6;">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.other) }}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">{{ exp_summary.category_percentages.other }}% of total</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 2: Salary vs Expenses vs Savings Horizon Bar Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-chart-column"></i> Spending Horizon Breakdown</h3>
+                <p class="card-subtitle">Weekly, Monthly, and Annual Spending Comparison</p>
+            </div>
+            <span class="badge badge-success">Multi-Horizon</span>
+        </div>
+        <div class="chart-container" style="position: relative; height: 280px;">
+            <canvas id="expenseHorizonBarChart"></canvas>
+        </div>
+        <div style="margin-top: 1rem; text-align: center; font-size: 0.85rem; color: var(--text-secondary);">
+            Monthly Take-Home: <strong>{{ user.currency }}{{ "{:,.2f}".format(monthly_net_income) }}</strong> · Monthly Expenses: <strong>{{ user.currency }}{{ "{:,.2f}".format(exp_summary.total_monthly) }}</strong> · Net Monthly Savings: <strong style="color: var(--success);">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.monthly_savings) }}</strong>
+        </div>
+    </div>
+</div>
+
+<!-- Expense Records Table & Filter -->
+<div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+        <!-- Category Filter Pills -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-right: 0.25rem;">Filter Category:</span>
+            <a href="{{ url_for('expenses_view', category='all') }}" class="pill-btn-sm {% if category_filter == 'all' %}active{% endif %}">All</a>
+            <a href="{{ url_for('expenses_view', category='groceries') }}" class="pill-btn-sm {% if category_filter == 'groceries' %}active{% endif %}"><i class="fa-solid fa-basket-shopping"></i> Groceries</a>
+            <a href="{{ url_for('expenses_view', category='clothing') }}" class="pill-btn-sm {% if category_filter == 'clothing' %}active{% endif %}"><i class="fa-solid fa-shirt"></i> Clothes</a>
+            <a href="{{ url_for('expenses_view', category='other') }}" class="pill-btn-sm {% if category_filter == 'other' %}active{% endif %}"><i class="fa-solid fa-bag-shopping"></i> Other Purchases</a>
+            <a href="{{ url_for('expenses_view', category='utilities') }}" class="pill-btn-sm {% if category_filter == 'utilities' %}active{% endif %}"><i class="fa-solid fa-bolt"></i> Utilities</a>
+            <a href="{{ url_for('expenses_view', category='dining') }}" class="pill-btn-sm {% if category_filter == 'dining' %}active{% endif %}"><i class="fa-solid fa-utensils"></i> Dining</a>
+        </div>
+
+        <!-- Add Expense CTA Button -->
+        <button class="btn btn-primary btn-sm" onclick="openModal('addExpenseModal')">
+            <i class="fa-solid fa-plus"></i> Add New Expense
+        </button>
+    </div>
+</div>
+
+<!-- Detailed Table of Expenses -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Expense Description</th>
+                    <th>Category</th>
+                    <th>Cadence</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exp in expenses %}
+                <tr>
+                    <td>
+                        <span style="font-weight: 600; color: var(--text-primary);">{{ exp.expense_date.strftime('%d %b %Y') }}</span>
+                    </td>
+                    <td>
+                        <strong style="color: var(--text-primary);">{{ exp.title }}</strong>
+                        {% if exp.notes %}
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ exp.notes }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if exp.category == 'groceries' %}
+                        <span class="badge badge-success"><i class="fa-solid fa-basket-shopping"></i> Groceries</span>
+                        {% elif exp.category == 'clothing' %}
+                        <span class="badge" style="background: rgba(236, 72, 153, 0.15); color: #f472b6;"><i class="fa-solid fa-shirt"></i> Clothes</span>
+                        {% elif exp.category == 'other' %}
+                        <span class="badge badge-primary"><i class="fa-solid fa-bag-shopping"></i> Other</span>
+                        {% elif exp.category == 'utilities' %}
+                        <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8;"><i class="fa-solid fa-bolt"></i> Utilities</span>
+                        {% elif exp.category == 'dining' %}
+                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i class="fa-solid fa-utensils"></i> Dining</span>
+                        {% else %}
+                        <span class="badge badge-subtle">{{ exp.category.title() }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: capitalize;">
+                            {{ exp.recurrence.replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td class="amount-negative" style="font-size: 1rem; font-weight: 700;">
+                        -{{ user.currency }}{{ "{:,.2f}".format(exp.amount) }}
+                    </td>
+                    <td>
+                        <form action="{{ url_for('delete_expense', expense_id=exp.id) }}" method="POST" onsubmit="return confirm('Delete this expense entry?');" style="display: inline;">
+                            <button type="submit" class="btn btn-outline btn-sm" title="Delete Expense" style="padding: 0.3rem 0.6rem; color: var(--danger); border-color: rgba(244, 63, 94, 0.3);">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                        <i class="fa-solid fa-cart-shopping" style="font-size: 2.5rem; margin-bottom: 0.75rem; display: block; opacity: 0.6;"></i>
+                        No expense records logged yet. Click <strong>Add New Expense</strong> to record groceries, clothes, or other purchases!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= ADD EXPENSE MODAL ================= -->
+<div class="modal-overlay" id="addExpenseModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <div class="modal-title-group">
+                <div class="modal-icon" style="background: rgba(244, 63, 94, 0.15); color: var(--danger);"><i class="fa-solid fa-cart-plus"></i></div>
+                <h3>Add New Expense</h3>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal('addExpenseModal')">&times;</button>
+        </div>
+        <form action="{{ url_for('add_expense') }}" method="POST" class="modal-form">
+            <div class="form-row">
+                <div class="form-group col-8">
+                    <label for="exp_title">Expense Title / Item</label>
+                    <input type="text" id="exp_title" name="title" placeholder="e.g. Weekly Supermarket Groceries, Winter Jacket" required>
+                </div>
+                <div class="form-group col-4">
+                    <label for="exp_amount">Amount ({{ user.currency }})</label>
+                    <input type="number" step="0.01" id="exp_amount" name="amount" placeholder="0.00" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-4">
+                    <label for="exp_category">Category</label>
+                    <select id="exp_category" name="category" required>
+                        <option value="groceries" selected>🛒 Groceries</option>
+                        <option value="clothing">👕 Clothes / Apparel</option>
+                        <option value="other">🛍️ Other Purchases</option>
+                        <option value="utilities">⚡ Utilities & Bills</option>
+                        <option value="dining">🍽️ Dining & Food</option>
+                        <option value="housing">🏠 Rent / Housing</option>
+                        <option value="transportation">🚗 Transportation</option>
+                    </select>
+                </div>
+                <div class="form-group col-4">
+                    <label for="exp_date">Date of Purchase</label>
+                    <input type="date" id="exp_date" name="expense_date" value="{{ now.strftime('%Y-%m-%d') }}" required>
+                </div>
+                <div class="form-group col-4">
+                    <label for="exp_recurrence">Cadence / Recurrence</label>
+                    <select id="exp_recurrence" name="recurrence">
+                        <option value="one_time">One-Time</option>
+                        <option value="weekly">Weekly Recurring</option>
+                        <option value="monthly" selected>Monthly Recurring</option>
+                        <option value="yearly">Yearly Recurring</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="exp_notes">Notes & Receipt Info (Optional)</label>
+                <textarea id="exp_notes" name="notes" rows="2" placeholder="Store name, invoice reference, or items purchased..."></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addExpenseModal')">Cancel</button>
+                <button type="submit" class="btn btn-danger" style="background: var(--danger);"><i class="fa-solid fa-plus"></i> Save Expense</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Embedded Data for Chart.js -->
+<script id="expense-summary-data" type="application/json">
+    {{ exp_summary | tojson }}
+</script>
+<script id="user-currency-symbol" type="application/json">
+    "{{ user.currency }}"
+</script>
+<script id="monthly-net-salary" type="application/json">
+    {{ monthly_net_income }}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/expense_charts.js') }}"></script>
+{% endblock %}

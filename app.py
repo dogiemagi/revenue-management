@@ -11,8 +11,8 @@ from flask import (
 from werkzeug.security import check_password_hash
 
 from config import Config
-from models import db, User, Family, SalaryProfile, SalaryRecord
-from calculator import calculate_salary_breakdown, normalize_to_annual
+from models import db, User, Family, SalaryProfile, SalaryRecord, ExpenseRecord
+from calculator import calculate_salary_breakdown, normalize_to_annual, calculate_expense_summary
 from demo_data import seed_demo_data
 
 app = Flask(__name__)
@@ -30,7 +30,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            flash("Please sign in to access your revenue dashboard.", "warning")
+            flash("Please sign in to access your revenue and expense dashboard.", "warning")
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -89,8 +89,8 @@ def register():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         job_title = request.form.get('job_title', 'Professional').strip()
-        currency = request.form.get('currency', '$').strip()
-        account_type = request.form.get('account_type', 'personal') # 'personal', 'create_family', 'join_family'
+        currency = request.form.get('currency', '₹').strip() # Default to Indian Rupee (₹)
+        account_type = request.form.get('account_type', 'personal')
         
         if not name or not email or not password:
             flash("Please fill in all required fields.", "warning")
@@ -131,17 +131,17 @@ def register():
             else:
                 flash("Invalid family invite code. Account created as personal.", "info")
 
-        # Initialize Default Salary Profile
+        # Initialize Default Salary Profile with Indian Rupee defaults
         profile = SalaryProfile(
             user_id=user.id,
             pay_frequency="monthly",
-            base_salary=5000.0,
-            allowances=500.0,
-            bonus_expected=0.0,
+            base_salary=75000.0,
+            allowances=12000.0,
+            bonus_expected=3000.0,
             tax_rate=15.0,
-            pension_rate=5.0,
-            insurance_deduction=150.0,
-            other_deductions=50.0
+            pension_rate=6.0,
+            insurance_deduction=2500.0,
+            other_deductions=1000.0
         )
         db.session.add(profile)
         db.session.commit()
@@ -167,7 +167,7 @@ def demo_login():
     if alex:
         session['user_id'] = alex.id
         session['user_name'] = alex.name
-        flash("Logged into Demo Account (Morgan Household) with live sample data!", "success")
+        flash("Logged into Demo Account (Morgan Household) with live sample salary & expense data in INR (₹)!", "success")
         return redirect(url_for('dashboard'))
     flash("Could not initialize demo account.", "danger")
     return redirect(url_for('login'))
@@ -179,6 +179,17 @@ def seed_demo():
     result = seed_demo_data()
     flash(result['message'], "info")
     return redirect(url_for('dashboard'))
+
+@app.route('/currency/switch', methods=['POST'])
+@login_required
+def switch_currency():
+    """Quick currency switcher for INR (₹), USD ($), EUR (€), GBP (£), etc."""
+    user = get_current_user()
+    new_currency = request.form.get('currency', '₹').strip()
+    user.currency = new_currency
+    db.session.commit()
+    flash(f"Active currency updated to {new_currency} throughout the application.", "success")
+    return redirect(request.referrer or url_for('dashboard'))
 
 # -------------------------------------------------------------
 # Main Application Dashboard
@@ -193,7 +204,7 @@ def dashboard():
         db.session.add(profile)
         db.session.commit()
 
-    # Calculate current user's profile breakdown
+    # Calculate current user's salary breakdown
     calc = calculate_salary_breakdown(
         base_salary=profile.base_salary,
         frequency=profile.pay_frequency,
@@ -206,6 +217,10 @@ def dashboard():
         standard_hours_per_week=profile.standard_hours_per_week,
         overtime_rate_multiplier=profile.overtime_rate_multiplier
     )
+
+    # Calculate Expenses Summary (Groceries, Clothes, Other)
+    expenses_list = ExpenseRecord.query.filter_by(user_id=user.id).all()
+    exp_summary = calculate_expense_summary(expenses_list, calc['monthly']['net'])
 
     # Fetch user's recent salary slips (last 5)
     recent_records = SalaryRecord.query.filter_by(user_id=user.id).order_by(SalaryRecord.pay_date.desc()).limit(5).all()
@@ -220,10 +235,104 @@ def dashboard():
         user=user,
         profile=profile,
         calc=calc,
+        exp_summary=exp_summary,
         recent_records=recent_records,
         total_earned_history=round(total_earned_history, 2),
         total_tax_paid_history=round(total_tax_paid_history, 2)
     )
+
+# -------------------------------------------------------------
+# Expense & Spending Management
+# -------------------------------------------------------------
+@app.route('/expenses')
+@login_required
+def expenses_view():
+    user = get_current_user()
+    category_filter = request.args.get('category', 'all')
+    
+    query = ExpenseRecord.query.filter_by(user_id=user.id)
+    if category_filter != 'all':
+        query = query.filter_by(category=category_filter)
+        
+    expenses_list = query.order_by(ExpenseRecord.expense_date.desc()).all()
+    all_expenses = ExpenseRecord.query.filter_by(user_id=user.id).all()
+
+    # User's monthly net salary for savings calculations
+    prof = user.profile or SalaryProfile(user_id=user.id)
+    calc = calculate_salary_breakdown(
+        base_salary=prof.base_salary,
+        frequency=prof.pay_frequency,
+        allowances=prof.allowances,
+        bonus_expected=prof.bonus_expected,
+        tax_rate=prof.tax_rate,
+        pension_rate=prof.pension_rate,
+        insurance_deduction=prof.insurance_deduction,
+        other_deductions=prof.other_deductions
+    )
+    monthly_net_income = calc['monthly']['net']
+    
+    exp_summary = calculate_expense_summary(all_expenses, monthly_net_income)
+
+    return render_template(
+        'expenses.html',
+        user=user,
+        expenses=expenses_list,
+        exp_summary=exp_summary,
+        category_filter=category_filter,
+        monthly_net_income=round(monthly_net_income, 2)
+    )
+
+@app.route('/expenses/add', methods=['POST'])
+@login_required
+def add_expense():
+    user = get_current_user()
+    
+    title = request.form.get('title', 'Expense').strip()
+    category = request.form.get('category', 'groceries').strip()
+    amount = float(request.form.get('amount', 0.0) or 0.0)
+    expense_date_str = request.form.get('expense_date', datetime.utcnow().strftime('%Y-%m-%d'))
+    recurrence = request.form.get('recurrence', 'one_time')
+    notes = request.form.get('notes', '').strip()
+
+    try:
+        parsed_date = datetime.strptime(expense_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        parsed_date = datetime.utcnow().date()
+
+    expense = ExpenseRecord(
+        user_id=user.id,
+        title=title,
+        category=category,
+        amount=amount,
+        expense_date=parsed_date,
+        recurrence=recurrence,
+        notes=notes
+    )
+    db.session.add(expense)
+    db.session.commit()
+
+    flash(f"Expense '{title}' of {user.currency}{amount:,.2f} recorded!", "success")
+    return redirect(request.referrer or url_for('expenses_view'))
+
+@app.route('/expenses/<int:expense_id>/delete', methods=['POST'])
+@login_required
+def delete_expense(expense_id):
+    user = get_current_user()
+    expense = ExpenseRecord.query.filter_by(id=expense_id, user_id=user.id).first_or_404()
+    db.session.delete(expense)
+    db.session.commit()
+    flash("Expense entry removed.", "info")
+    return redirect(request.referrer or url_for('expenses_view'))
+
+@app.route('/api/expense-chart-data')
+@login_required
+def expense_chart_data():
+    user = get_current_user()
+    all_expenses = ExpenseRecord.query.filter_by(user_id=user.id).all()
+    prof = user.profile or SalaryProfile(user_id=user.id)
+    calc = calculate_salary_breakdown(base_salary=prof.base_salary, frequency=prof.pay_frequency)
+    summary = calculate_expense_summary(all_expenses, calc['monthly']['net'])
+    return jsonify(summary)
 
 # -------------------------------------------------------------
 # Family / Household View
@@ -482,15 +591,15 @@ def export_csv():
 def calculator_page():
     user = get_current_user()
     defaults = {
-        'base_salary': 5000.0,
+        'base_salary': 75000.0,
         'frequency': 'monthly',
-        'allowances': 500.0,
-        'bonus': 0.0,
+        'allowances': 12000.0,
+        'bonus': 3000.0,
         'tax_rate': 15.0,
-        'pension_rate': 5.0,
-        'insurance': 150.0,
-        'other': 50.0,
-        'currency': '$'
+        'pension_rate': 6.0,
+        'insurance': 2500.0,
+        'other': 1000.0,
+        'currency': '₹'
     }
     if user and user.profile:
         p = user.profile
@@ -510,12 +619,12 @@ def calculator_page():
 def api_calculate():
     data = request.get_json() or {}
     
-    base_salary = float(data.get('base_salary', 5000.0) or 0.0)
+    base_salary = float(data.get('base_salary', 75000.0) or 0.0)
     frequency = data.get('frequency', 'monthly')
     allowances = float(data.get('allowances', 0.0) or 0.0)
     bonus = float(data.get('bonus', 0.0) or 0.0)
     tax_rate = float(data.get('tax_rate', 15.0) or 0.0)
-    pension_rate = float(data.get('pension_rate', 5.0) or 0.0)
+    pension_rate = float(data.get('pension_rate', 6.0) or 0.0)
     insurance = float(data.get('insurance', 0.0) or 0.0)
     other = float(data.get('other', 0.0) or 0.0)
     hours = float(data.get('hours', 40.0) or 40.0)
@@ -563,7 +672,7 @@ def update_profile():
 
     db.session.add(profile)
     db.session.commit()
-    flash("Salary settings and preferences updated!", "success")
+    flash(f"Salary preferences updated with active currency {user.currency}!", "success")
     return redirect(url_for('dashboard'))
 
 # -------------------------------------------------------------
@@ -588,7 +697,6 @@ def personal_chart_data():
         other_deductions=profile.other_deductions
     )
 
-    # Monthly Net History from records
     records_list = SalaryRecord.query.filter_by(user_id=user.id).order_by(SalaryRecord.pay_date.asc()).all()
     history_labels = [r.pay_date.strftime('%b %Y') for r in records_list[-8:]]
     history_net = [r.net_amount for r in records_list[-8:]]

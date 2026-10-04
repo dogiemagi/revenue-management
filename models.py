@@ -41,7 +41,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     job_title = db.Column(db.String(100), default='Professional')
-    currency = db.Column(db.String(5), default='$')
+    currency = db.Column(db.String(5), default='₹') # Default to Indian Rupee (₹)
     
     family_id = db.Column(db.Integer, db.ForeignKey('families.id', ondelete='SET NULL'), nullable=True)
     is_family_admin = db.Column(db.Boolean, default=False)
@@ -50,6 +50,7 @@ class User(db.Model):
     # Relationships
     profile = db.relationship('SalaryProfile', backref='user', uselist=False, cascade='all, delete-orphan')
     salary_records = db.relationship('SalaryRecord', backref='user', lazy=True, cascade='all, delete-orphan', order_by='SalaryRecord.pay_date.desc()')
+    expenses = db.relationship('ExpenseRecord', backref='user', lazy=True, cascade='all, delete-orphan', order_by='ExpenseRecord.expense_date.desc()')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -78,14 +79,14 @@ class SalaryProfile(db.Model):
     
     # Frequency: 'weekly', 'biweekly', 'monthly', 'yearly'
     pay_frequency = db.Column(db.String(20), default='monthly')
-    base_salary = db.Column(db.Float, default=5000.0)
-    allowances = db.Column(db.Float, default=500.0)       # Housing, Transport, etc.
-    bonus_expected = db.Column(db.Float, default=200.0)   # Monthly average bonus
+    base_salary = db.Column(db.Float, default=75000.0)
+    allowances = db.Column(db.Float, default=12000.0)      # Housing, Transport, Special Allowance
+    bonus_expected = db.Column(db.Float, default=5000.0)   # Monthly average bonus
     
-    tax_rate = db.Column(db.Float, default=15.0)          # Tax percentage %
-    pension_rate = db.Column(db.Float, default=5.0)       # 401k / PF / Retirement %
-    insurance_deduction = db.Column(db.Float, default=150.0) # Flat per pay period
-    other_deductions = db.Column(db.Float, default=50.0)     # Union, perks, etc.
+    tax_rate = db.Column(db.Float, default=15.0)           # Tax percentage %
+    pension_rate = db.Column(db.Float, default=6.0)        # EPF / PF / 401(k) %
+    insurance_deduction = db.Column(db.Float, default=2500.0) # Flat per pay period
+    other_deductions = db.Column(db.Float, default=1000.0)    # Professional tax, perks, etc.
     
     standard_hours_per_week = db.Column(db.Float, default=40.0)
     overtime_rate_multiplier = db.Column(db.Float, default=1.5)
@@ -144,5 +145,34 @@ class SalaryRecord(db.Model):
             'other_deductions': round(self.other_deductions, 2),
             'net_amount': round(self.net_amount, 2),
             'total_deductions': round(self.tax_deduction + self.pension_deduction + self.insurance_deduction + self.other_deductions, 2),
+            'notes': self.notes or ''
+        }
+
+
+class ExpenseRecord(db.Model):
+    """Tracks personal and household spending (Groceries, Clothes, Other purchases)"""
+    __tablename__ = 'expense_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    
+    title = db.Column(db.String(140), nullable=False)
+    # Categories: 'groceries', 'clothing', 'other', 'housing', 'utilities', 'dining', 'healthcare'
+    category = db.Column(db.String(50), nullable=False, default='groceries')
+    amount = db.Column(db.Float, nullable=False, default=0.0)
+    expense_date = db.Column(db.Date, nullable=False, default=datetime.utcnow().date)
+    # Recurrence: 'one_time', 'weekly', 'monthly', 'yearly'
+    recurrence = db.Column(db.String(20), default='one_time')
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'category': self.category,
+            'amount': round(self.amount, 2),
+            'expense_date': self.expense_date.strftime('%Y-%m-%d'),
+            'recurrence': self.recurrence,
             'notes': self.notes or ''
         }

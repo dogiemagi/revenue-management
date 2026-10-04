@@ -10,24 +10,24 @@
                 <i class="fa-solid fa-chart-line-up"></i>
             </div>
             <h2 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px;">Get Started with RevTrack</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Create your personal or family revenue workspace</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Create your personal or family revenue & expense workspace</p>
         </div>
 
         <form action="{{ url_for('register') }}" method="POST">
             <div class="form-row">
                 <div class="form-group col-7">
                     <label for="reg_name"><i class="fa-solid fa-user"></i> Full Name</label>
-                    <input type="text" id="reg_name" name="name" placeholder="Alex Morgan" required>
+                    <input type="text" id="reg_name" name="name" placeholder="Rahul Sharma" required>
                 </div>
                 <div class="form-group col-5">
                     <label for="reg_currency"><i class="fa-solid fa-coins"></i> Currency</label>
                     <select id="reg_currency" name="currency">
-                        <option value="$" selected>USD ($)</option>
-                        <option value="₹">INR (₹)</option>
-                        <option value="€">EUR (€)</option>
-                        <option value="£">GBP (£)</option>
-                        <option value="C$">CAD (C$)</option>
-                        <option value="A$">AUD (A$)</option>
+                        <option value="₹" selected>₹ INR (Rupees)</option>
+                        <option value="$">$ USD (Dollars)</option>
+                        <option value="€">€ EUR (Euros)</option>
+                        <option value="£">£ GBP (Pounds)</option>
+                        <option value="C$">C$ CAD (Canada)</option>
+                        <option value="A$">A$ AUD (Australia)</option>
                     </select>
                 </div>
             </div>
@@ -35,17 +35,17 @@
             <div class="form-row">
                 <div class="form-group col-6">
                     <label for="reg_email"><i class="fa-regular fa-envelope"></i> Email Address</label>
-                    <input type="email" id="reg_email" name="email" placeholder="alex@company.com" required>
+                    <input type="email" id="reg_email" name="email" placeholder="rahul@example.com" required>
                 </div>
                 <div class="form-group col-6">
                     <label for="reg_job"><i class="fa-solid fa-briefcase"></i> Job Title</label>
-                    <input type="text" id="reg_job" name="job_title" placeholder="Software Engineer">
+                    <input type="text" id="reg_job" name="job_title" placeholder="Senior Software Engineer">
                 </div>
             </div>
 
             <div class="form-group">
                 <label for="reg_password"><i class="fa-solid fa-lock"></i> Password</label>
-                <input type="password" id="reg_password" name="password" placeholder="Create a strong password" required minlength="6">
+                <input type="password" id="reg_password" name="password" placeholder="Create a secure password" required minlength="6">
             </div>
 
             <!-- Account / Family Mode Selection -->
@@ -77,7 +77,7 @@
             <!-- Conditional Family Fields -->
             <div id="create_family_section" style="display: none; background: var(--bg-input); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-color);">
                 <label for="family_name_input" style="font-size: 0.8rem; font-weight: 600;"><i class="fa-solid fa-people-roof"></i> Household Name</label>
-                <input type="text" id="family_name_input" name="family_name" placeholder="e.g. Morgan Household">
+                <input type="text" id="family_name_input" name="family_name" placeholder="e.g. Sharma Household">
             </div>
 
             <div id="join_family_section" style="display: none; background: var(--bg-input); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-color);">

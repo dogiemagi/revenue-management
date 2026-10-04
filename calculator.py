@@ -1,7 +1,7 @@
 """
 Salary & Revenue Calculation Engine
 Handles multi-frequency calculations (Weekly, Bi-Weekly, Monthly, Yearly, Hourly),
-itemized deductions, overtime multipliers, and tax projections.
+itemized deductions, overtime multipliers, tax projections, and expense/savings tracking.
 """
 
 def normalize_to_annual(amount, frequency):
@@ -24,14 +24,14 @@ def normalize_to_annual(amount, frequency):
 
 
 def calculate_salary_breakdown(
-    base_salary=5000.0,
+    base_salary=75000.0,
     frequency='monthly',
-    allowances=500.0,
+    allowances=12000.0,
     bonus_expected=0.0,
     tax_rate=15.0,
-    pension_rate=5.0,
-    insurance_deduction=150.0,
-    other_deductions=50.0,
+    pension_rate=6.0,
+    insurance_deduction=2500.0,
+    other_deductions=1000.0,
     standard_hours_per_week=40.0,
     overtime_hours=0.0,
     overtime_rate_multiplier=1.5
@@ -66,15 +66,13 @@ def calculate_salary_breakdown(
     hourly_rate = annual_base / annual_hours if annual_hours > 0 else 0.0
     overtime_hourly_rate = hourly_rate * overtime_rate_multiplier
     
-    # Normalize overtime hours (assumed input frequency matches frequency parameter)
     annual_overtime_hours = normalize_to_annual(overtime_hours, frequency)
     annual_overtime_pay = annual_overtime_hours * overtime_hourly_rate
     
     # Total Gross Annual
     annual_gross = annual_base + annual_allowances + annual_bonus + annual_overtime_pay
     
-    # Deductions Annual
-    # Pension is usually calculated on Base Salary
+    # Pension (EPF / 401k / PF) is calculated on Base Salary
     annual_pension = annual_base * (pension_rate / 100.0)
     
     # Taxable amount after pension (pre-tax deduction)
@@ -154,4 +152,66 @@ def calculate_salary_breakdown(
             'effective_tax_rate': round(effective_tax_rate, 1),
             'pension_rate': round(pension_rate, 1)
         }
+    }
+
+
+def calculate_expense_summary(expense_records, monthly_net_income=0.0):
+    """
+    Computes categorized spending and multi-horizon totals (Weekly, Monthly, Yearly).
+    Specific focus on Groceries, Clothes / Apparel, and Other purchases.
+    """
+    categories = {
+        'groceries': 0.0,
+        'clothing': 0.0,
+        'other': 0.0,
+        'housing': 0.0,
+        'utilities': 0.0,
+        'dining': 0.0,
+        'transportation': 0.0
+    }
+    
+    total_raw_amount = 0.0
+    
+    for exp in expense_records:
+        cat = (exp.category or 'other').lower()
+        if cat not in categories:
+            cat = 'other'
+            
+        amt = float(exp.amount or 0.0)
+        rec = exp.recurrence or 'one_time'
+        
+        # Convert to monthly equivalent for aggregate budgeting
+        if rec == 'weekly':
+            monthly_equiv = amt * 4.333
+        elif rec == 'yearly':
+            monthly_equiv = amt / 12.0
+        else:
+            monthly_equiv = amt # one_time or monthly
+            
+        categories[cat] += monthly_equiv
+        total_raw_amount += monthly_equiv
+
+    total_monthly = round(total_raw_amount, 2)
+    total_yearly = round(total_monthly * 12.0, 2)
+    total_weekly = round(total_yearly / 52.0, 2)
+    
+    # Net Savings & Savings Rate
+    monthly_net_income = float(monthly_net_income or 0.0)
+    monthly_savings = max(0.0, monthly_net_income - total_monthly) if monthly_net_income > 0 else 0.0
+    savings_rate = round((monthly_savings / monthly_net_income * 100.0), 1) if monthly_net_income > 0 else 0.0
+
+    # Format category breakdown percentages
+    category_percentages = {}
+    for k, v in categories.items():
+        category_percentages[k] = round((v / total_monthly * 100.0), 1) if total_monthly > 0 else 0.0
+
+    return {
+        'total_weekly': total_weekly,
+        'total_monthly': total_monthly,
+        'total_yearly': total_yearly,
+        'monthly_savings': round(monthly_savings, 2),
+        'yearly_savings': round(monthly_savings * 12.0, 2),
+        'savings_rate': savings_rate,
+        'categories': {k: round(v, 2) for k, v in categories.items()},
+        'category_percentages': category_percentages
     }

@@ -4,13 +4,13 @@
 
 {% block page_heading %}
 <div class="page-title-box">
-    <h2>Personal Revenue Overview</h2>
-    <span class="page-subtitle">Welcome back, {{ user.name }} · {{ user.currency }} Currency</span>
+    <h2>Personal Revenue & Expense Overview</h2>
+    <span class="page-subtitle">Welcome back, {{ user.name }} · Active Currency: <strong>{{ user.currency }}</strong></span>
 </div>
 {% endblock %}
 
 {% block content %}
-<!-- Top Metric Summary Cards (Weekly, Monthly, Yearly) -->
+<!-- Top Metric Summary Cards (Weekly, Monthly, Yearly + Expenses & Savings) -->
 <div class="kpi-grid">
     <!-- Monthly Net Take-Home -->
     <div class="kpi-card">
@@ -27,37 +27,37 @@
         </div>
     </div>
 
-    <!-- Monthly Gross Revenue -->
-    <div class="kpi-card">
+    <!-- Monthly Expenses (Groceries, Clothes, Other) -->
+    <div class="kpi-card" style="border-color: rgba(244, 63, 94, 0.3);">
         <div class="kpi-top">
-            <span class="kpi-title">Monthly Gross</span>
-            <div class="kpi-icon-wrap primary">
-                <i class="fa-solid fa-money-bill-trend-up"></i>
+            <span class="kpi-title">Monthly Living Expenses</span>
+            <div class="kpi-icon-wrap danger">
+                <i class="fa-solid fa-basket-shopping"></i>
             </div>
         </div>
-        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.gross) }}</div>
+        <div class="kpi-value" style="color: var(--danger);">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.total_monthly) }}</div>
         <div class="kpi-meta">
-            <span>Base: {{ user.currency }}{{ "{:,.2f}".format(calc.monthly.base) }}</span>
-            <span>+ Perks: {{ user.currency }}{{ "{:,.2f}".format(calc.monthly.allowances) }}</span>
+            <span>Groceries: {{ user.currency }}{{ "{:,.2f}".format(exp_summary.categories.groceries) }}</span>
+            <a href="{{ url_for('expenses_view') }}" style="margin-left: auto; font-size: 0.75rem; color: var(--primary);">View All &rarr;</a>
         </div>
     </div>
 
-    <!-- Weekly Net Equivalent -->
-    <div class="kpi-card">
+    <!-- Net Monthly Savings (Take-Home minus Expenses) -->
+    <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.3);">
         <div class="kpi-top">
-            <span class="kpi-title">Weekly Net Equivalent</span>
-            <div class="kpi-icon-wrap info">
-                <i class="fa-solid fa-calendar-week"></i>
+            <span class="kpi-title">Net Monthly Savings</span>
+            <div class="kpi-icon-wrap success">
+                <i class="fa-solid fa-piggy-bank"></i>
             </div>
         </div>
-        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(calc.weekly.net) }}</div>
+        <div class="kpi-value" style="color: var(--success);">{{ user.currency }}{{ "{:,.2f}".format(exp_summary.monthly_savings) }}</div>
         <div class="kpi-meta">
-            <span>Hourly: {{ user.currency }}{{ "{:,.2f}".format(calc.hourly.net_hourly) }}/hr</span>
-            <span>(40h/wk)</span>
+            <span class="trend-up"><i class="fa-solid fa-arrow-trend-up"></i> {{ exp_summary.savings_rate }}%</span>
+            <span>Savings Rate</span>
         </div>
     </div>
 
-    <!-- Annual Projected Revenue -->
+    <!-- Annual Net Projected Revenue -->
     <div class="kpi-card">
         <div class="kpi-top">
             <span class="kpi-title">Annual Net Projected</span>
@@ -96,7 +96,7 @@
                 <div style="font-weight: 700; color: var(--danger);">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.tax) }}</div>
             </div>
             <div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Pension/401k ({{ calc.rates.pension_rate }}%)</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Pension/EPF ({{ calc.rates.pension_rate }}%)</div>
                 <div style="font-weight: 700; color: #818cf8;">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.pension) }}</div>
             </div>
             <div>
