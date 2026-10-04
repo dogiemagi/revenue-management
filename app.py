@@ -38,6 +38,11 @@ def login_required(f):
         if 'user_id' not in session:
             flash("Please sign in to access your revenue and expense dashboard.", "warning")
             return redirect(url_for('login'))
+        # Guard against stale session where user_id exists but user was deleted
+        if not get_current_user():
+            session.clear()
+            flash("Session expired. Please sign in again.", "warning")
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -209,6 +214,11 @@ def switch_currency():
 @login_required
 def dashboard():
     user = get_current_user()
+    if not user:
+        session.clear()
+        flash("Session expired. Please sign in again.", "warning")
+        return redirect(url_for('login'))
+
     profile = user.profile
     if not profile:
         profile = SalaryProfile(user_id=user.id)
