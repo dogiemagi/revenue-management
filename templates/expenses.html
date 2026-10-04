@@ -219,7 +219,22 @@
                     <td class="amount-negative" style="font-size: 1rem; font-weight: 700;">
                         -{{ user.currency }}{{ "{:,.2f}".format(exp.amount) }}
                     </td>
-                    <td>
+                    <td style="display: flex; gap: 0.4rem; align-items: center;">
+                        <!-- Edit -->
+                        <button type="button" class="btn btn-outline btn-sm" title="Edit Expense"
+                            style="padding: 0.3rem 0.6rem; color: var(--primary); border-color: rgba(99,102,241,0.3);"
+                            onclick="openEditExpenseModal(
+                                {{ exp.id }},
+                                '{{ exp.title | replace("'", "\\'") }}',
+                                '{{ exp.category }}',
+                                {{ exp.amount }},
+                                '{{ exp.expense_date.strftime('%Y-%m-%d') }}',
+                                '{{ exp.recurrence }}',
+                                '{{ (exp.notes or '') | replace("'", "\\'") }}'
+                            )">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <!-- Delete -->
                         <form action="{{ url_for('delete_expense', expense_id=exp.id) }}" method="POST" onsubmit="return confirm('Delete this expense entry?');" style="display: inline;">
                             <button type="submit" class="btn btn-outline btn-sm" title="Delete Expense" style="padding: 0.3rem 0.6rem; color: var(--danger); border-color: rgba(244, 63, 94, 0.3);">
                                 <i class="fa-solid fa-trash-can"></i>
@@ -364,11 +379,107 @@ function filterExpenses(cat, btnEl) {
         </form>
     </div>
 </div>
+
+<!-- ================= EDIT EXPENSE MODAL ================= -->
+<div class="modal-overlay" id="editExpenseModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <div class="modal-title-group">
+                <div class="modal-icon" style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15)); color: var(--primary); border: 1px solid rgba(99,102,241,0.25);">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 700;">Edit Expense</h3>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">Update the details for this expense entry</p>
+                </div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal('editExpenseModal')">&times;</button>
+        </div>
+        <form id="editExpenseForm" action="" method="POST" class="modal-form">
+            <!-- Category Grid -->
+            <div class="form-group">
+                <label>Expense Category</label>
+                <div class="category-selector-grid" id="editExpenseCatGrid">
+                    <div class="cat-select-card" data-cat="groceries" onclick="selectEditExpenseCategory(this,'groceries')"><div class="cat-icon-wrap"><i class="fa-solid fa-basket-shopping"></i></div><span>Groceries</span></div>
+                    <div class="cat-select-card" data-cat="clothing" onclick="selectEditExpenseCategory(this,'clothing')"><div class="cat-icon-wrap"><i class="fa-solid fa-shirt"></i></div><span>Clothing</span></div>
+                    <div class="cat-select-card" data-cat="dining" onclick="selectEditExpenseCategory(this,'dining')"><div class="cat-icon-wrap"><i class="fa-solid fa-utensils"></i></div><span>Dining</span></div>
+                    <div class="cat-select-card" data-cat="utilities" onclick="selectEditExpenseCategory(this,'utilities')"><div class="cat-icon-wrap"><i class="fa-solid fa-bolt-lightning"></i></div><span>Utilities</span></div>
+                    <div class="cat-select-card" data-cat="housing" onclick="selectEditExpenseCategory(this,'housing')"><div class="cat-icon-wrap"><i class="fa-solid fa-house"></i></div><span>Housing</span></div>
+                    <div class="cat-select-card" data-cat="transportation" onclick="selectEditExpenseCategory(this,'transportation')"><div class="cat-icon-wrap"><i class="fa-solid fa-car-side"></i></div><span>Transport</span></div>
+                    <div class="cat-select-card" data-cat="healthcare" onclick="selectEditExpenseCategory(this,'healthcare')"><div class="cat-icon-wrap"><i class="fa-solid fa-heart-pulse"></i></div><span>Healthcare</span></div>
+                    <div class="cat-select-card" data-cat="other" onclick="selectEditExpenseCategory(this,'other')"><div class="cat-icon-wrap"><i class="fa-solid fa-bag-shopping"></i></div><span>Other</span></div>
+                </div>
+                <input type="hidden" id="edit_exp_category" name="category" value="groceries">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-8">
+                    <label for="edit_exp_title">Expense Description / Item</label>
+                    <input type="text" id="edit_exp_title" name="title" placeholder="e.g. Weekly Supermarket" required>
+                </div>
+                <div class="form-group col-4">
+                    <label for="edit_exp_amount">Amount ({{ user.currency }})</label>
+                    <input type="number" step="0.01" id="edit_exp_amount" name="amount" placeholder="0.00" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-6">
+                    <label for="edit_exp_date">Date of Purchase</label>
+                    <input type="date" id="edit_exp_date" name="expense_date" required>
+                </div>
+                <div class="form-group col-6">
+                    <label for="edit_exp_recurrence">Cadence / Recurrence</label>
+                    <select id="edit_exp_recurrence" name="recurrence">
+                        <option value="one_time">One-Time Expense</option>
+                        <option value="weekly">Weekly Recurring</option>
+                        <option value="monthly">Monthly Recurring</option>
+                        <option value="yearly">Yearly Recurring</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_exp_notes">Notes (Optional)</label>
+                <textarea id="edit_exp_notes" name="notes" rows="2" placeholder="Store name, invoice reference..."></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editExpenseModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     function selectExpenseCategory(el, category) {
         document.querySelectorAll('#expenseCatGrid .cat-select-card').forEach(c => c.classList.remove('active'));
         el.classList.add('active');
         document.getElementById('exp_category').value = category;
+    }
+
+    function selectEditExpenseCategory(el, category) {
+        document.querySelectorAll('#editExpenseCatGrid .cat-select-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('edit_exp_category').value = category;
+    }
+
+    function openEditExpenseModal(id, title, category, amount, date, recurrence, notes) {
+        // Set form action URL
+        document.getElementById('editExpenseForm').action = '/expense/' + id + '/edit';
+        // Pre-fill fields
+        document.getElementById('edit_exp_title').value = title;
+        document.getElementById('edit_exp_amount').value = amount;
+        document.getElementById('edit_exp_date').value = date;
+        document.getElementById('edit_exp_recurrence').value = recurrence;
+        document.getElementById('edit_exp_notes').value = notes;
+        // Highlight category card
+        document.querySelectorAll('#editExpenseCatGrid .cat-select-card').forEach(c => {
+            c.classList.toggle('active', c.dataset.cat === category);
+        });
+        document.getElementById('edit_exp_category').value = category;
+        openModal('editExpenseModal');
     }
 </script>
 

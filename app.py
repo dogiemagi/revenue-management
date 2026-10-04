@@ -345,6 +345,26 @@ def delete_expense(expense_id):
     flash("Expense entry removed.", "info")
     return redirect(request.referrer or url_for('expenses_view'))
 
+@app.route('/expense/<int:expense_id>/edit', methods=['POST'])
+@login_required
+def edit_expense(expense_id):
+    user = get_current_user()
+    expense = ExpenseRecord.query.filter_by(id=expense_id, user_id=user.id).first_or_404()
+    try:
+        expense.title      = request.form.get('title', expense.title).strip()
+        expense.category   = request.form.get('category', expense.category)
+        expense.amount     = float(request.form.get('amount', expense.amount))
+        expense.expense_date = datetime.strptime(request.form.get('expense_date'), '%Y-%m-%d').date()
+        expense.recurrence = request.form.get('recurrence', expense.recurrence)
+        expense.notes      = request.form.get('notes', '').strip() or None
+        db.session.commit()
+        flash("Expense updated successfully.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Could not update expense: {e}", "danger")
+    return redirect(url_for('expenses_view'))
+
+
 @app.route('/api/expense-chart-data')
 @login_required
 def expense_chart_data():
