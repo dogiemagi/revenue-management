@@ -52,7 +52,7 @@ def inject_global_data():
     current_user = get_current_user()
     show_onboarding = False
     if current_user:
-        show_onboarding = not getattr(current_user, 'is_onboarded', True)
+        show_onboarding = not bool(getattr(current_user, 'is_onboarded', False))
     return {
         'current_user': current_user,
         'show_onboarding': show_onboarding,
@@ -985,9 +985,9 @@ def ai_finance_query():
         'monthly_net': calc['monthly']['net'],
         'monthly_tax': calc['monthly']['tax'],
         'monthly_pension': calc['monthly']['pension'],
-        'annual_gross': calc['annual']['gross'],
-        'annual_net': calc['annual']['net'],
-        'annual_tax': calc['annual']['tax'],
+        'annual_gross': (calc.get('yearly') or calc.get('annual', {})).get('gross', 0.0),
+        'annual_net': (calc.get('yearly') or calc.get('annual', {})).get('net', 0.0),
+        'annual_tax': (calc.get('yearly') or calc.get('annual', {})).get('tax', 0.0),
         'total_monthly_expenses': exp_summary['total_monthly'],
         'monthly_savings': exp_summary['monthly_savings'],
         'savings_rate_pct': exp_summary['savings_rate'],
