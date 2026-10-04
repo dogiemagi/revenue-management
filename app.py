@@ -19,9 +19,15 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
-# Ensure database tables exist upon start
+# Ensure database tables exist upon start & safely add is_onboarded if missing
 with app.app_context():
     db.create_all()
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("ALTER TABLE users ADD COLUMN is_onboarded BOOLEAN DEFAULT FALSE"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 # -------------------------------------------------------------
 # Authentication & Access Decorators
@@ -44,8 +50,12 @@ def get_current_user():
 @app.context_processor
 def inject_global_data():
     current_user = get_current_user()
+    show_onboarding = False
+    if current_user:
+        show_onboarding = not getattr(current_user, 'is_onboarded', True)
     return {
         'current_user': current_user,
+        'show_onboarding': show_onboarding,
         'current_year': datetime.utcnow().year,
         'now': datetime.utcnow()
     }
@@ -104,7 +114,8 @@ def register():
             name=name,
             email=email,
             job_title=job_title,
-            currency=currency
+            currency=currency,
+            is_onboarded=False
         )
         user.set_password(password)
         db.session.add(user)
@@ -745,6 +756,301 @@ def family_chart_data():
         'net_values': net_values,
         'gross_values': gross_values
     })
+
+# -------------------------------------------------------------
+# Onboarding Setup Wizard Routes
+# -------------------------------------------------------------
+@app.route('/onboarding/complete', methods=['POST'])
+@login_required
+def complete_onboarding():
+    user = get_current_user()
+    currency = request.form.get('currency', '₹').strip()
+    job_title = request.form.get('job_title', user.job_title).strip()
+    pay_frequency = request.form.get('pay_frequency', 'monthly')
+    
+    try:
+        base_salary = float(request.form.get('base_salary', 75000.0) or 75000.0)
+    except ValueError:
+        base_salary = 75000.0
+        
+    try:
+        allowances = float(request.form.get('allowances', 10000.0) or 0.0)
+    except ValueError:
+        allowances = 0.0
+        
+    try:
+        tax_rate = float(request.form.get('tax_rate', 15.0) or 0.0)
+    except ValueError:
+        tax_rate = 15.0
+        
+    try:
+        pension_rate = float(request.form.get('pension_rate', 6.0) or 0.0)
+    except ValueError:
+        pension_rate = 6.0
+
+    user.currency = currency
+    user.job_title = job_title
+    user.is_onboarded = True
+
+    # Update or create Salary Profile
+    if not user.profile:
+        user.profile = SalaryProfile(user_id=user.id)
+    user.profile.pay_frequency = pay_frequency
+    user.profile.base_salary = base_salary
+    user.profile.allowances = allowances
+    user.profile.tax_rate = tax_rate
+    user.profile.pension_rate = pension_rate
+
+    # Optional initial baseline expenses entered in wizard
+    today = datetime.utcnow().date()
+    exp_inputs = [
+        ('groceries', 'exp_groceries', 'Baseline Monthly Groceries'),
+        ('clothing', 'exp_clothing', 'Monthly Clothing & Apparel'),
+        ('dining', 'exp_dining', 'Dining & Food Outflow'),
+        ('utilities', 'exp_utilities', 'Utilities & Recurring Bills'),
+        ('other', 'exp_other', 'Personal & Other Purchases')
+    ]
+    for cat, form_key, title in exp_inputs:
+        val_str = request.form.get(form_key, '0').strip()
+        try:
+            amt = float(val_str or 0)
+            if amt > 0:
+                db.session.add(ExpenseRecord(
+                    user_id=user.id,
+                    category=cat,
+                    title=title,
+                    amount=amt,
+                    cadence='monthly',
+                    expense_date=today
+                ))
+        except ValueError:
+            pass
+
+    db.session.commit()
+    flash(f"Welcome aboard! Your financial profile and baseline budgets have been calibrated in {currency}.", "success")
+    return redirect(url_for('dashboard'))
+
+@app.route('/onboarding/skip', methods=['POST'])
+@login_required
+def skip_onboarding():
+    user = get_current_user()
+    user.is_onboarded = True
+    db.session.commit()
+    flash("Setup completed with standard defaults. You can customize anytime via Quick Setup or Profile Settings.", "info")
+    return redirect(url_for('dashboard'))
+
+# -------------------------------------------------------------
+# AI Financial Assistant Query Engine
+# -------------------------------------------------------------
+def generate_builtin_finance_insight(query, ctx):
+    """Rule-based financial advisor fallback grounded in actual live user metrics."""
+    q = query.lower()
+    curr = ctx['currency']
+    
+    # 1. Affordability check (e.g., "can I afford 25000", "can I buy")
+    import re
+    amounts = re.findall(r'[\d,]+(?:\.\d+)?', query.replace(curr, '').replace(',', ''))
+    if any(k in q for k in ['afford', 'can i buy', 'can i purchase', 'can i spend', 'cost']) and amounts:
+        try:
+            target_amt = float(amounts[0].replace(',', ''))
+            monthly_savings = ctx['monthly_savings']
+            if target_amt <= 0:
+                pass
+            elif target_amt <= monthly_savings:
+                rem = monthly_savings - target_amt
+                pct = (target_amt / monthly_savings) * 100
+                return (
+                    f"### ✅ Yes, you can comfortably afford this!\n\n"
+                    f"- **Requested Purchase:** **{curr}{target_amt:,.2f}**\n"
+                    f"- **Your Monthly Net Savings:** **{curr}{monthly_savings:,.2f}**\n"
+                    f"- **Impact on Savings:** Takes about **{pct:.1f}%** of your monthly surplus.\n"
+                    f"- **Remaining Surplus After Purchase:** **{curr}{rem:,.2f}**\n\n"
+                    f"**Recommendation:** Because this is within your positive cash flow of {curr}{monthly_savings:,.2f}/month, you can make this purchase without going into deficit or touching emergency reserves."
+                )
+            else:
+                deficit = target_amt - monthly_savings
+                return (
+                    f"### ⚠️ Caution: Exceeds Monthly Surplus\n\n"
+                    f"- **Requested Purchase:** **{curr}{target_amt:,.2f}**\n"
+                    f"- **Your Current Monthly Savings:** **{curr}{monthly_savings:,.2f}**\n"
+                    f"- **Monthly Deficit:** **{curr}{deficit:,.2f}**\n\n"
+                    f"**Recommendation:** Buying this in a single month would exceed your monthly free cash flow by {curr}{deficit:,.2f}. Consider saving for **{int(target_amt / max(monthly_savings, 1)) + 1} months** or allocating a dedicated sinking fund."
+                )
+        except Exception:
+            pass
+
+    # 2. Income / Take-Home Pay / Salary
+    if any(k in q for k in ['take home', 'net salary', 'net pay', 'gross', 'income', 'salary', 'earn', 'how much do i make']):
+        return (
+            f"### 💰 Your Income & Take-Home Pay Summary\n\n"
+            f"- **Role:** {ctx['job_title']}\n"
+            f"- **Base Salary ({ctx['pay_frequency']}):** **{curr}{ctx['base_salary']:,.2f}**\n"
+            f"- **Monthly Gross Income:** **{curr}{ctx['monthly_gross']:,.2f}**\n"
+            f"- **Monthly Taxes & Deductions:** -{curr}{(ctx['monthly_tax'] + ctx['monthly_pension']):,.2f}\n"
+            f"- **Monthly Net Take-Home Pay:** **{curr}{ctx['monthly_net']:,.2f}**\n"
+            f"- **Annual Net Take-Home:** **{curr}{ctx['annual_net']:,.2f}** (Gross: {curr}{ctx['annual_gross']:,.2f})\n\n"
+            f"**Takeaway:** For every 100 earned, you take home approximately **{(ctx['monthly_net'] / max(ctx['monthly_gross'], 1) * 100):.1f}%** after statutory deductions."
+        )
+
+    # 3. Expenses & Categories (Groceries, Clothes, Dining, Other)
+    if any(k in q for k in ['groceries', 'grocery', 'clothes', 'clothing', 'dining', 'food', 'utilities', 'other', 'expenses', 'spending', 'spend']):
+        cats = ctx['categories']
+        return (
+            f"### 🛒 Your Spending & Expense Breakdown\n\n"
+            f"- **Total Monthly Outflow:** **{curr}{ctx['total_monthly_expenses']:,.2f}**\n"
+            f"#### Itemized Categories:\n"
+            f"- **Groceries:** {curr}{cats['groceries']:,.2f}\n"
+            f"- **Clothing & Apparel:** {curr}{cats['clothing']:,.2f}\n"
+            f"- **Dining & Restaurants:** {curr}{cats['dining']:,.2f}\n"
+            f"- **Utilities & Bills:** {curr}{cats['utilities']:,.2f}\n"
+            f"- **Housing:** {curr}{cats['housing']:,.2f}\n"
+            f"- **Transportation:** {curr}{cats['transportation']:,.2f}\n"
+            f"- **Healthcare:** {curr}{cats['healthcare']:,.2f}\n"
+            f"- **Other Purchases:** {curr}{cats['other']:,.2f}\n\n"
+            f"**Expense Load:** Your living costs consume **{100 - ctx['savings_rate_pct']:.1f}%** of your monthly net income."
+        )
+
+    # 4. Savings & Savings Rate
+    if any(k in q for k in ['save', 'saving', 'savings', 'rate', 'invest', 'emergency']):
+        status = "🌟 Exceptional" if ctx['savings_rate_pct'] >= 30 else ("👍 Healthy" if ctx['savings_rate_pct'] >= 20 else "⚠️ Room for Growth")
+        return (
+            f"### 📈 Your Savings Analysis ({status})\n\n"
+            f"- **Monthly Net Income:** {curr}{ctx['monthly_net']:,.2f}\n"
+            f"- **Monthly Expenses:** -{curr}{ctx['total_monthly_expenses']:,.2f}\n"
+            f"- **Net Monthly Savings:** **{curr}{ctx['monthly_savings']:,.2f}**\n"
+            f"- **Current Savings Rate:** **{ctx['savings_rate_pct']}%**\n\n"
+            f"#### 50/30/20 Benchmark Guideline:\n"
+            f"- **Needs (≤50%):** Essential housing, groceries, utilities.\n"
+            f"- **Wants (≤30%):** Dining, clothing, entertainment.\n"
+            f"- **Savings (≥20%):** You are currently saving **{ctx['savings_rate_pct']}%** of your take-home pay.\n"
+            f"**Recommendation:** Maintain a 3-6 month emergency fund ({curr}{(ctx['total_monthly_expenses'] * 4):,.2f}) in liquid savings."
+        )
+
+    # 5. Taxes & Deductions
+    if any(k in q for k in ['tax', 'taxes', 'pf', 'pension', 'deduct', 'deduction', 'epf', '401k']):
+        return (
+            f"### ⚖️ Your Tax & Statutory Deductions\n\n"
+            f"- **Monthly Tax Withheld:** **{curr}{ctx['monthly_tax']:,.2f}**\n"
+            f"- **Monthly Pension / PF / Retirement:** **{curr}{ctx['monthly_pension']:,.2f}**\n"
+            f"- **Annual Projected Tax Outflow:** **{curr}{ctx['annual_tax']:,.2f}**\n\n"
+            f"**Tip:** Verify local tax deductions (such as Section 80C/NPS in India or 401(k)/IRA contributions) to legally reduce tax liability."
+        )
+
+    # Default Comprehensive Diagnostic
+    return (
+        f"### 📊 Financial Health Diagnostic for {ctx['user_name']}\n\n"
+        f"Here is your real-time financial standing in **{curr}**:\n\n"
+        f"- **Net Take-Home Pay:** **{curr}{ctx['monthly_net']:,.2f}** / month\n"
+        f"- **Living Expenses:** **{curr}{ctx['total_monthly_expenses']:,.2f}** / month\n"
+        f"- **Net Surplus / Savings:** **{curr}{ctx['monthly_savings']:,.2f}** / month (**{ctx['savings_rate_pct']}%**)\n"
+        f"- **Annual Net Run-Rate:** **{curr}{ctx['annual_net']:,.2f}**\n\n"
+        f"**Ask me any specific query!** Examples:\n"
+        f"- *'Can I afford a {curr}30,000 laptop?'*\n"
+        f"- *'How much am I spending on groceries vs dining?'*\n"
+        f"- *'How can I increase my monthly savings?'*"
+    )
+
+@app.route('/api/ai-finance-query', methods=['POST'])
+@login_required
+def ai_finance_query():
+    user = get_current_user()
+    data = request.get_json() or {}
+    query = data.get('query', '').strip()
+    if not query:
+        return jsonify({'error': 'Please provide a question about your revenue, taxes, or expenses.'}), 400
+
+    profile = user.profile
+    calc = calculate_salary_breakdown(
+        base_salary=profile.base_salary if profile else 75000.0,
+        frequency=profile.pay_frequency if profile else 'monthly',
+        allowances=profile.allowances if profile else 0.0,
+        bonus_expected=profile.bonus_expected if profile else 0.0,
+        tax_rate=profile.tax_rate if profile else 15.0,
+        pension_rate=profile.pension_rate if profile else 6.0,
+        insurance_deduction=profile.insurance_deduction if profile else 0.0,
+        other_deductions=profile.other_deductions if profile else 0.0
+    )
+    
+    expenses_list = ExpenseRecord.query.filter_by(user_id=user.id).all()
+    exp_summary = calculate_expense_summary(expenses_list, calc['monthly']['net'])
+    currency = user.currency or '₹'
+
+    fin_context = {
+        'user_name': user.name,
+        'job_title': user.job_title,
+        'currency': currency,
+        'base_salary': profile.base_salary if profile else 0.0,
+        'pay_frequency': profile.pay_frequency if profile else 'monthly',
+        'monthly_gross': calc['monthly']['gross'],
+        'monthly_net': calc['monthly']['net'],
+        'monthly_tax': calc['monthly']['tax'],
+        'monthly_pension': calc['monthly']['pension'],
+        'annual_gross': calc['annual']['gross'],
+        'annual_net': calc['annual']['net'],
+        'annual_tax': calc['annual']['tax'],
+        'total_monthly_expenses': exp_summary['total_monthly'],
+        'monthly_savings': exp_summary['monthly_savings'],
+        'savings_rate_pct': exp_summary['savings_rate'],
+        'categories': exp_summary['categories']
+    }
+
+    # If GEMINI_API_KEY is configured in environment, use generative AI
+    gemini_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+    if gemini_key:
+        try:
+            import urllib.request
+            import json as pyjson
+            
+            prompt = f"""
+You are RevTrack AI, an elite, highly encouraging, and mathematically accurate personal finance advisor.
+Answer the user's question directly and concisely based strictly on their actual financial metrics below.
+Format your answer with markdown bolding, clear bullet points, and actionable financial steps.
+Use their active currency: {currency}.
+
+User Financial Metrics:
+- Name: {fin_context['user_name']} ({fin_context['job_title']})
+- Currency: {currency}
+- Base Salary: {currency}{fin_context['base_salary']:,.2f} ({fin_context['pay_frequency']})
+- Monthly Gross Income: {currency}{fin_context['monthly_gross']:,.2f}
+- Monthly Net Take-Home Pay: {currency}{fin_context['monthly_net']:,.2f}
+- Monthly Tax Deductions: {currency}{fin_context['monthly_tax']:,.2f}
+- Monthly Pension / PF: {currency}{fin_context['monthly_pension']:,.2f}
+- Annual Gross: {currency}{fin_context['annual_gross']:,.2f} | Annual Net: {currency}{fin_context['annual_net']:,.2f}
+- Annual Tax: {currency}{fin_context['annual_tax']:,.2f}
+- Monthly Outflow (Total Expenses): {currency}{fin_context['total_monthly_expenses']:,.2f}
+- Monthly Savings Surplus: {currency}{fin_context['monthly_savings']:,.2f} ({fin_context['savings_rate_pct']}% savings rate)
+- Category Expenses:
+  * Groceries: {currency}{fin_context['categories']['groceries']:,.2f}
+  * Clothing: {currency}{fin_context['categories']['clothing']:,.2f}
+  * Dining: {currency}{fin_context['categories']['dining']:,.2f}
+  * Utilities: {currency}{fin_context['categories']['utilities']:,.2f}
+  * Housing: {currency}{fin_context['categories']['housing']:,.2f}
+  * Transportation: {currency}{fin_context['categories']['transportation']:,.2f}
+  * Healthcare: {currency}{fin_context['categories']['healthcare']:,.2f}
+  * Other Purchases: {currency}{fin_context['categories']['other']:,.2f}
+
+User Question: "{query}"
+"""
+            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 600}
+            }
+            req = urllib.request.Request(
+                api_url,
+                data=pyjson.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req, timeout=8) as response:
+                result = pyjson.loads(response.read().decode('utf-8'))
+                ai_text = result['candidates'][0]['content']['parts'][0]['text']
+                return jsonify({'reply': ai_text, 'powered_by': 'Gemini AI'})
+        except Exception as e:
+            pass
+
+    # Built-in intelligent engine fallback
+    reply = generate_builtin_finance_insight(query, fin_context)
+    return jsonify({'reply': reply, 'powered_by': 'RevTrack Finance Engine'})
 
 # Health Check Route for Render Free Tier Heartbeat
 @app.route('/health')

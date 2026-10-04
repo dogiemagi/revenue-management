@@ -45,6 +45,7 @@ class User(db.Model):
     
     family_id = db.Column(db.Integer, db.ForeignKey('families.id', ondelete='SET NULL'), nullable=True)
     is_family_admin = db.Column(db.Boolean, default=False)
+    is_onboarded = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships

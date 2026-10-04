@@ -115,6 +115,19 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="javascript:void(0)" class="nav-link" onclick="toggleAIChat()">
+                            <i class="fa-solid fa-wand-magic-sparkles text-accent"></i>
+                            <span>Ask Financial AI</span>
+                            <span class="badge badge-primary">AI</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="javascript:void(0)" class="nav-link" onclick="openModal('onboardingModal')">
+                            <i class="fa-solid fa-sliders text-accent"></i>
+                            <span>Quick Setup Wizard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="{{ url_for('export_csv') }}" class="nav-link">
                             <i class="fa-solid fa-file-arrow-down"></i>
                             <span>Export Records (CSV)</span>
@@ -539,10 +552,255 @@
             </form>
         </div>
     </div>
+
+    <!-- ================= FIRST-TIME ONBOARDING SETUP WIZARD MODAL ================= -->
+    <div class="modal-backdrop" id="onboardingModal">
+        <div class="modal-card" style="max-width: 600px;">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title"><i class="fa-solid fa-sliders text-accent"></i> Welcome to RevTrack!</h3>
+                    <p class="modal-subtitle">Let's personalize your salary & expense system in 3 quick steps.</p>
+                </div>
+                <form action="{{ url_for('skip_onboarding') }}" method="POST" style="margin: 0;">
+                    <button type="submit" class="btn btn-outline btn-sm" title="Skip setup and use defaults">Skip for Now</button>
+                </form>
+            </div>
+
+            <!-- Step Progress Indicators -->
+            <div class="wizard-stepper">
+                <div class="step-indicator active" id="stepIndicator1" onclick="goToWizardStep(1)">
+                    <span class="step-num">1</span>
+                    <span class="step-label">Currency & Role</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step-indicator" id="stepIndicator2" onclick="goToWizardStep(2)">
+                    <span class="step-num">2</span>
+                    <span class="step-label">Income & Tax</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step-indicator" id="stepIndicator3" onclick="goToWizardStep(3)">
+                    <span class="step-num">3</span>
+                    <span class="step-label">Living Expenses</span>
+                </div>
+            </div>
+
+            <form action="{{ url_for('complete_onboarding') }}" method="POST" id="onboardingForm">
+                <!-- STEP 1: Profile & Currency -->
+                <div class="wizard-step" id="wizardStep1">
+                    <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1.25rem;">
+                        <div style="font-weight: 600; font-size: 0.85rem; color: var(--primary); margin-bottom: 0.2rem;">
+                            <i class="fa-solid fa-circle-info"></i> Step 1 of 3: Primary Setup
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">
+                            Select the currency you get paid in. Indian Rupee (₹) is preselected as your default.
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob_currency"><i class="fa-solid fa-coins"></i> Select Primary Currency</label>
+                        <select id="ob_currency" name="currency" class="form-control" required>
+                            <option value="₹" {% if current_user.currency == '₹' %}selected{% endif %}>₹ — Indian Rupee (INR)</option>
+                            <option value="$" {% if current_user.currency == '$' %}selected{% endif %}>$ — US Dollar (USD)</option>
+                            <option value="€" {% if current_user.currency == '€' %}selected{% endif %}>€ — Euro (EUR)</option>
+                            <option value="£" {% if current_user.currency == '£' %}selected{% endif %}>£ — British Pound (GBP)</option>
+                            <option value="C$" {% if current_user.currency == 'C$' %}selected{% endif %}>C$ — Canadian Dollar (CAD)</option>
+                            <option value="A$" {% if current_user.currency == 'A$' %}selected{% endif %}>A$ — Australian Dollar (AUD)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="ob_job_title"><i class="fa-solid fa-briefcase"></i> Job Title / Role</label>
+                            <input type="text" id="ob_job_title" name="job_title" value="{{ current_user.job_title or 'Professional' }}" placeholder="e.g. AI Engineer, Doctor" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="ob_frequency"><i class="fa-solid fa-calendar"></i> Pay Frequency</label>
+                            <select id="ob_frequency" name="pay_frequency">
+                                <option value="monthly" selected>Monthly (Most Common)</option>
+                                <option value="bi-weekly">Bi-Weekly (Every 2 Weeks)</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="yearly">Annual (Yearly Lump Sum)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer" style="justify-content: flex-end;">
+                        <button type="button" class="btn btn-primary" onclick="goToWizardStep(2)">
+                            Continue to Income <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Income & Taxes -->
+                <div class="wizard-step" id="wizardStep2" style="display: none;">
+                    <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1.25rem;">
+                        <div style="font-weight: 600; font-size: 0.85rem; color: #10b981; margin-bottom: 0.2rem;">
+                            <i class="fa-solid fa-money-bill-wave"></i> Step 2 of 3: Compensation & Tax Withholding
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">
+                            Enter your base salary and statutory rates so RevTrack can accurately calculate your net take-home pay.
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="ob_base_salary">Base Salary Amount</label>
+                            <input type="number" step="0.01" id="ob_base_salary" name="base_salary" value="{{ current_user.profile.base_salary if current_user.profile else 75000.0 }}" placeholder="e.g. 75000" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="ob_allowances">HRA / Fixed Allowances</label>
+                            <input type="number" step="0.01" id="ob_allowances" name="allowances" value="{{ current_user.profile.allowances if current_user.profile else 10000.0 }}" placeholder="e.g. 10000">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="ob_tax_rate">Income Tax Rate (%)</label>
+                            <input type="number" step="0.1" id="ob_tax_rate" name="tax_rate" value="{{ current_user.profile.tax_rate if current_user.profile else 15.0 }}" placeholder="e.g. 15">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="ob_pension_rate">EPF / Pension / 401(k) (%)</label>
+                            <input type="number" step="0.1" id="ob_pension_rate" name="pension_rate" value="{{ current_user.profile.pension_rate if current_user.profile else 6.0 }}" placeholder="e.g. 6 or 12">
+                        </div>
+                    </div>
+
+                    <div class="modal-footer" style="justify-content: space-between;">
+                        <button type="button" class="btn btn-outline" onclick="goToWizardStep(1)">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="goToWizardStep(3)">
+                            Continue to Expenses <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Baseline Living Expenses -->
+                <div class="wizard-step" id="wizardStep3" style="display: none;">
+                    <div style="background: rgba(249, 115, 22, 0.08); border: 1px solid rgba(249, 115, 22, 0.2); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1.25rem;">
+                        <div style="font-weight: 600; font-size: 0.85rem; color: #f97316; margin-bottom: 0.2rem;">
+                            <i class="fa-solid fa-basket-shopping"></i> Step 3 of 3: Estimated Monthly Outflow
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">
+                            Enter your typical monthly expenses. RevTrack will generate your visual charts and savings rate immediately!
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="ob_groceries"><i class="fa-solid fa-basket-shopping" style="color: #10b981;"></i> Groceries & Food</label>
+                            <input type="number" step="0.01" id="ob_groceries" name="exp_groceries" value="12000" placeholder="e.g. 12000">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="ob_clothing"><i class="fa-solid fa-shirt" style="color: #ec4899;"></i> Clothes & Apparel</label>
+                            <input type="number" step="0.01" id="ob_clothing" name="exp_clothing" value="3500" placeholder="e.g. 3500">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="ob_dining"><i class="fa-solid fa-utensils" style="color: #f97316;"></i> Dining & Takeout</label>
+                            <input type="number" step="0.01" id="ob_dining" name="exp_dining" value="4000" placeholder="e.g. 4000">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="ob_utilities"><i class="fa-solid fa-bolt-lightning" style="color: #f59e0b;"></i> Utilities & Bills</label>
+                            <input type="number" step="0.01" id="ob_utilities" name="exp_utilities" value="3000" placeholder="e.g. 3000">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob_other"><i class="fa-solid fa-bag-shopping" style="color: #14b8a6;"></i> Other Purchases & Misc</label>
+                        <input type="number" step="0.01" id="ob_other" name="exp_other" value="5000" placeholder="e.g. 5000">
+                    </div>
+
+                    <div class="modal-footer" style="justify-content: space-between;">
+                        <button type="button" class="btn btn-outline" onclick="goToWizardStep(2)">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </button>
+                        <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); border-color: #059669;">
+                            <i class="fa-solid fa-circle-check"></i> Complete Setup & Launch Dashboard
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= FLOATING AI ASSISTANT BUTTON ================= -->
+    <div class="floating-ai-btn" id="aiChatToggleBtn" onclick="toggleAIChat()" title="Ask RevTrack Financial AI">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Ask Financial AI</span>
+    </div>
+
+    <!-- ================= REVTRACK AI FINANCIAL ASSISTANT DRAWER ================= -->
+    <div class="ai-chat-window" id="aiChatDrawer" style="display: none;">
+        <!-- Header -->
+        <div class="ai-chat-header">
+            <div class="ai-chat-title-group">
+                <div class="ai-avatar-icon">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                    <div class="ai-chat-title">RevTrack AI Advisor</div>
+                    <div class="ai-chat-subtitle">
+                        <span class="ai-status-pulse"></span> Grounded in your live salary & expenses
+                    </div>
+                </div>
+            </div>
+            <button class="ai-close-btn" onclick="toggleAIChat()" title="Close AI Advisor">&times;</button>
+        </div>
+
+        <!-- Quick Query Suggestion Pills -->
+        <div class="ai-quick-pills">
+            <button class="ai-pill" onclick="askQuickAI('What is my monthly take-home pay and tax deduction?')">
+                💰 Take-home pay
+            </button>
+            <button class="ai-pill" onclick="askQuickAI('How much am I spending on groceries, clothes, and other purchases?')">
+                🛒 Category spending
+            </button>
+            <button class="ai-pill" onclick="askQuickAI('Can I afford a {{ current_user.currency }}25,000 purchase this month?')">
+                🛍️ Can I afford {{ current_user.currency }}25,000?
+            </button>
+            <button class="ai-pill" onclick="askQuickAI('What is my savings rate and how can I improve it?')">
+                📈 Savings rate advice
+            </button>
+            <button class="ai-pill" onclick="askQuickAI('Give me a full financial health diagnostic overview.')">
+                📊 Financial diagnostic
+            </button>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div class="ai-chat-messages" id="aiChatMessages">
+            <div class="ai-msg ai-msg-bot">
+                <div class="ai-msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="ai-msg-bubble">
+                    Hello <strong>{{ current_user.name }}</strong>! I am your <strong>RevTrack AI Financial Assistant</strong>.
+                    <br><br>
+                    I have live access to your active currency (<strong>{{ current_user.currency }}</strong>), salary profile, and recorded expenses. Ask me anything about your take-home pay, affordability for purchases, taxes, or category budgets!
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Bar -->
+        <div class="ai-chat-input-bar">
+            <input type="text" id="aiQueryInput" placeholder="Ask about income, affordability, groceries, taxes..." onkeydown="if(event.key==='Enter') submitAIQuery()">
+            <button class="btn btn-primary btn-sm" id="aiSendBtn" onclick="submitAIQuery()">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
     {% endif %}
 
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        {% if show_onboarding %}
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                openModal('onboardingModal');
+            }, 350);
+        });
+        {% endif %}
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

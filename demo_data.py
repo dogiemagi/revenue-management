@@ -27,7 +27,8 @@ def seed_demo_data():
         job_title="Senior Software Architect",
         currency="₹", # Indian Rupee default
         family_id=morgan_family.id,
-        is_family_admin=True
+        is_family_admin=True,
+        is_onboarded=True
     )
     alex.set_password("password123")
     db.session.add(alex)
@@ -111,7 +112,8 @@ def seed_demo_data():
         job_title="Lead Product Designer",
         currency="₹",
         family_id=morgan_family.id,
-        is_family_admin=False
+        is_family_admin=False,
+        is_onboarded=True
     )
     elena.set_password("password123")
     db.session.add(elena)
@@ -159,7 +161,8 @@ def seed_demo_data():
         job_title="Junior Data Analyst",
         currency="₹",
         family_id=morgan_family.id,
-        is_family_admin=False
+        is_family_admin=False,
+        is_onboarded=True
     )
     lucas.set_password("password123")
     db.session.add(lucas)
