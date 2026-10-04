@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}RevTrack — Professional Salary & Revenue Management Platform{% endblock %}
+
+{% block content %}
+<div class="landing-hero" style="max-width: 1100px; margin: 3rem auto; text-align: center;">
+    <!-- Pill Badge -->
+    <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); padding: 0.35rem 1rem; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 600; color: #a5b4fc; margin-bottom: 1.5rem;">
+        <i class="fa-solid fa-sparkles"></i> Executive Salary & Household Revenue Intelligence
+    </div>
+
+    <!-- Main Headline -->
+    <h1 style="font-size: 3.25rem; font-weight: 800; line-height: 1.15; letter-spacing: -1.5px; margin-bottom: 1.25rem;">
+        Smart Salary Analytics for <br>
+        <span style="background: linear-gradient(135deg, #818cf8 20%, #c084fc 80%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Individuals & Families</span>
+    </h1>
+
+    <p style="font-size: 1.15rem; color: var(--text-secondary); max-width: 720px; margin: 0 auto 2.5rem auto; line-height: 1.6;">
+        Calculate, track, and project your weekly, bi-weekly, monthly, and yearly take-home pay. Aggregate multi-earner household revenue with intelligent charts and automated tax slips.
+    </p>
+
+    <!-- Call to Actions -->
+    <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 3.5rem;">
+        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
+            <i class="fa-solid fa-rocket"></i> Get Started Free
+        </a>
+        <form action="{{ url_for('demo_login') }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-outline btn-lg" style="border-color: var(--success); color: var(--success);">
+                <i class="fa-solid fa-bolt-lightning"></i> 1-Click Live Demo (Pre-loaded)
+            </button>
+        </form>
+        <a href="{{ url_for('calculator_page') }}" class="btn btn-outline btn-lg">
+            <i class="fa-solid fa-calculator"></i> Try Salary Calculator
+        </a>
+    </div>
+
+    <!-- Hero Visual Preview Cards -->
+    <div class="kpi-grid" style="text-align: left; margin-bottom: 3rem;">
+        <div class="kpi-card" style="border-color: rgba(99, 102, 241, 0.25);">
+            <div class="kpi-top">
+                <span class="kpi-title">Weekly & Monthly Precision</span>
+                <div class="kpi-icon-wrap primary"><i class="fa-solid fa-calculator"></i></div>
+            </div>
+            <div class="kpi-value" style="font-size: 1.4rem;">4 Cadence Conversions</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Instantly convert between Hourly, Weekly, Bi-Weekly, Monthly, and Annual compensation.
+            </p>
+        </div>
+
+        <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.25);">
+            <div class="kpi-top">
+                <span class="kpi-title">Family & Household Mode</span>
+                <div class="kpi-icon-wrap success"><i class="fa-solid fa-people-roof"></i></div>
+            </div>
+            <div class="kpi-value" style="font-size: 1.4rem;">Multi-Earner Insights</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Invite partners or family members with an 8-char code. Track joint revenue & individual contribution shares.
+            </p>
+        </div>
+
+        <div class="kpi-card" style="border-color: rgba(245, 158, 11, 0.25);">
+            <div class="kpi-top">
+                <span class="kpi-title">Rich Visualizations</span>
+                <div class="kpi-icon-wrap warning"><i class="fa-solid fa-chart-pie"></i></div>
+            </div>
+            <div class="kpi-value" style="font-size: 1.4rem;">Interactive Chart.js</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Visual donuts for itemized taxes, pensions, and insurance. Multi-bar charts for gross vs net horizons.
+            </p>
+        </div>
+
+        <div class="kpi-card" style="border-color: rgba(14, 165, 233, 0.25);">
+            <div class="kpi-top">
+                <span class="kpi-title">Cloud Native & Free Tier</span>
+                <div class="kpi-icon-wrap info"><i class="fa-solid fa-cloud"></i></div>
+            </div>
+            <div class="kpi-value" style="font-size: 1.4rem;">Render + Cloud Postgres</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Engineered for Render’s 512MB free tier with Gunicorn and serverless PostgreSQL support.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Feature Cards Grid -->
+<div style="max-width: 1100px; margin: 0 auto 4rem auto;">
+    <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: 2rem; font-weight: 800;">Engineered for Financial Clarity</h2>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Every feature you need to master your compensation and family cash flow</p>
+    </div>
+
+    <div class="grid-3">
+        <div class="card">
+            <div class="kpi-icon-wrap primary" style="margin-bottom: 1rem;"><i class="fa-solid fa-scale-balanced"></i></div>
+            <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Deductions & Taxes</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                Calculate precise itemized deductions: progressive income tax withholding, retirement 401(k) / PF percentages, health insurance, and custom benefits.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="kpi-icon-wrap success" style="margin-bottom: 1rem;"><i class="fa-solid fa-print"></i></div>
+            <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Official Pay Slips</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                Generate and print professional pay stubs with clean CSS print styles. Audit earnings, allowances, deductions, and net take-home in one click.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="kpi-icon-wrap info" style="margin-bottom: 1rem;"><i class="fa-solid fa-file-csv"></i></div>
+            <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">CSV & Data Export</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                Export all historical salary records into clean CSV format ready for Excel, Google Sheets, or accountant tax filings.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Personal Dashboard — RevTrack{% endblock %}
+
+{% block page_heading %}
+<div class="page-title-box">
+    <h2>Personal Revenue Overview</h2>
+    <span class="page-subtitle">Welcome back, {{ user.name }} · {{ user.currency }} Currency</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Top Metric Summary Cards (Weekly, Monthly, Yearly) -->
+<div class="kpi-grid">
+    <!-- Monthly Net Take-Home -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Monthly Take-Home</span>
+            <div class="kpi-icon-wrap success">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.net) }}</div>
+        <div class="kpi-meta">
+            <span class="trend-up"><i class="fa-solid fa-shield-halved"></i> {{ calc.rates.retention_rate }}%</span>
+            <span>of Gross Kept</span>
+        </div>
+    </div>
+
+    <!-- Monthly Gross Revenue -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Monthly Gross</span>
+            <div class="kpi-icon-wrap primary">
+                <i class="fa-solid fa-money-bill-trend-up"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.gross) }}</div>
+        <div class="kpi-meta">
+            <span>Base: {{ user.currency }}{{ "{:,.2f}".format(calc.monthly.base) }}</span>
+            <span>+ Perks: {{ user.currency }}{{ "{:,.2f}".format(calc.monthly.allowances) }}</span>
+        </div>
+    </div>
+
+    <!-- Weekly Net Equivalent -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Weekly Net Equivalent</span>
+            <div class="kpi-icon-wrap info">
+                <i class="fa-solid fa-calendar-week"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(calc.weekly.net) }}</div>
+        <div class="kpi-meta">
+            <span>Hourly: {{ user.currency }}{{ "{:,.2f}".format(calc.hourly.net_hourly) }}/hr</span>
+            <span>(40h/wk)</span>
+        </div>
+    </div>
+
+    <!-- Annual Projected Revenue -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Annual Net Projected</span>
+            <div class="kpi-icon-wrap warning">
+                <i class="fa-solid fa-vault"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(calc.yearly.net) }}</div>
+        <div class="kpi-meta">
+            <span>Gross: {{ user.currency }}{{ "{:,.2f}".format(calc.yearly.gross) }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Visualization Charts Section -->
+<div class="grid-2">
+    <!-- Chart 1: Income vs Deductions Donut Breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Monthly Income Distribution</h3>
+                <p class="card-subtitle">Take-Home Pay vs. Itemized Deductions</p>
+            </div>
+            <span class="badge badge-primary">Monthly</span>
+        </div>
+        <div class="chart-container" style="position: relative; height: 280px;">
+            <canvas id="deductionDonutChart"></canvas>
+        </div>
+        <div class="chart-legend-stats" style="display: flex; justify-content: space-around; margin-top: 1rem; text-align: center;">
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Net Take-Home</div>
+                <div style="font-weight: 700; color: var(--success);">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.net) }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Income Tax ({{ calc.rates.effective_tax_rate }}%)</div>
+                <div style="font-weight: 700; color: var(--danger);">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.tax) }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Pension/401k ({{ calc.rates.pension_rate }}%)</div>
+                <div style="font-weight: 700; color: #818cf8;">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.pension) }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Insurance & Other</div>
+                <div style="font-weight: 700; color: #f59e0b;">{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.insurance + calc.monthly.other_deductions) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 2: Multi-Horizon Salary Comparison (Weekly, Monthly, Yearly) -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-chart-simple"></i> Pay Horizon Comparison</h3>
+                <p class="card-subtitle">Gross vs Net Across Time Horizons</p>
+            </div>
+            <div class="horizon-toggle-pills" id="horizonButtons">
+                <button class="pill-btn-sm active" onclick="switchHorizon('monthly')">Monthly</button>
+                <button class="pill-btn-sm" onclick="switchHorizon('weekly')">Weekly</button>
+                <button class="pill-btn-sm" onclick="switchHorizon('yearly')">Yearly</button>
+            </div>
+        </div>
+        <div class="chart-container" style="position: relative; height: 280px;">
+            <canvas id="horizonBarChart"></canvas>
+        </div>
+        <div class="horizon-details" id="horizonDetails" style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary); text-align: center;">
+            Showing Monthly breakdown: Gross <strong>{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.gross) }}</strong> vs Net <strong>{{ user.currency }}{{ "{:,.2f}".format(calc.monthly.net) }}</strong>.
+        </div>
+    </div>
+</div>
+
+<!-- Historical Net Revenue Trend (Line Chart) & Recent Pay Slips -->
+<div class="grid-2">
+    <!-- Chart 3: Historical Net Trend -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-arrow-trend-up"></i> Net Revenue History</h3>
+                <p class="card-subtitle">Actual recorded take-home pay over time</p>
+            </div>
+            <a href="{{ url_for('records') }}" class="btn btn-outline btn-sm">All Records</a>
+        </div>
+        <div class="chart-container" style="position: relative; height: 260px;">
+            <canvas id="netHistoryLineChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Salary Records List -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-receipt"></i> Recent Salary Slips</h3>
+                <p class="card-subtitle">Latest payments and earnings</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('addSlipModal')">
+                <i class="fa-solid fa-plus"></i> Add
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Title / Date</th>
+                        <th>Category</th>
+                        <th>Gross</th>
+                        <th>Net Take-Home</th>
+                        <th>Slip</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in recent_records %}
+                    <tr>
+                        <td>
+                            <strong style="color: var(--text-primary);">{{ rec.title }}</strong><br>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">{{ rec.pay_date.strftime('%b %d, %Y') }}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-primary">{{ rec.category.replace('_', ' ').title() }}</span>
+                        </td>
+                        <td>{{ user.currency }}{{ "{:,.2f}".format(rec.gross_amount) }}</td>
+                        <td class="amount-positive">{{ user.currency }}{{ "{:,.2f}".format(rec.net_amount) }}</td>
+                        <td>
+                            <a href="{{ url_for('print_slip', record_id=rec.id) }}" target="_blank" class="btn btn-outline btn-sm" title="View & Print Pay Slip">
+                                <i class="fa-solid fa-print"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            <i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
+                            No salary slips recorded yet. Click <strong>New Pay Slip</strong> or load sample demo data to preview!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Calculation Data for Chart.js -->
+<script id="calc-data" type="application/json">
+    {{ calc | tojson }}
+</script>
+<script id="user-currency" type="application/json">
+    "{{ user.currency }}"
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}

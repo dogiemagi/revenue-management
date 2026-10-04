@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Interactive Salary & Revenue Calculator — RevTrack{% endblock %}
+
+{% block page_heading %}
+<div class="page-title-box">
+    <h2>Interactive Salary Calculator</h2>
+    <span class="page-subtitle">Simulate Weekly, Bi-Weekly, Monthly, and Yearly Take-Home Pay</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <!-- Calculator Inputs Panel -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fa-solid fa-sliders"></i> Compensation Parameters</h3>
+            <button class="btn btn-outline btn-sm" onclick="resetCalculatorDefaults()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+        </div>
+
+        <form id="salaryCalcForm">
+            <div class="form-row">
+                <div class="form-group col-7">
+                    <label for="calc_base_salary">Base Salary (<span class="currency-display">{{ defaults.currency }}</span>)</label>
+                    <input type="number" step="10" id="calc_base_salary" value="{{ defaults.base_salary }}">
+                </div>
+                <div class="form-group col-5">
+                    <label for="calc_frequency">Pay Frequency</label>
+                    <select id="calc_frequency">
+                        <option value="monthly" {% if defaults.frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+                        <option value="weekly" {% if defaults.frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                        <option value="biweekly" {% if defaults.frequency == 'biweekly' %}selected{% endif %}>Bi-Weekly</option>
+                        <option value="yearly" {% if defaults.frequency == 'yearly' %}selected{% endif %}>Yearly (Annual)</option>
+                        <option value="hourly" {% if defaults.frequency == 'hourly' %}selected{% endif %}>Hourly</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-6">
+                    <label for="calc_allowances">Allowances / Perks / HRA</label>
+                    <input type="number" step="10" id="calc_allowances" value="{{ defaults.allowances }}">
+                </div>
+                <div class="form-group col-6">
+                    <label for="calc_bonus">Target Bonus</label>
+                    <input type="number" step="10" id="calc_bonus" value="{{ defaults.bonus }}">
+                </div>
+            </div>
+
+            <div class="form-divider">
+                <span>Deductions & Rates</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-6">
+                    <div style="display: flex; justify-content: space-between;">
+                        <label for="calc_tax_rate">Income Tax Rate</label>
+                        <span id="taxRateLabel" style="font-size: 0.8rem; font-weight: 700; color: var(--danger);">{{ defaults.tax_rate }}%</span>
+                    </div>
+                    <input type="range" min="0" max="50" step="0.5" id="calc_tax_rate" value="{{ defaults.tax_rate }}" style="width: 100%; accent-color: var(--danger);">
+                </div>
+                <div class="form-group col-6">
+                    <div style="display: flex; justify-content: space-between;">
+                        <label for="calc_pension_rate">Retirement / 401(k) / PF</label>
+                        <span id="pensionRateLabel" style="font-size: 0.8rem; font-weight: 700; color: #818cf8;">{{ defaults.pension_rate }}%</span>
+                    </div>
+                    <input type="range" min="0" max="25" step="0.5" id="calc_pension_rate" value="{{ defaults.pension_rate }}" style="width: 100%; accent-color: var(--primary);">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-6">
+                    <label for="calc_insurance">Insurance Deduction (<span class="currency-display">{{ defaults.currency }}</span>)</label>
+                    <input type="number" step="5" id="calc_insurance" value="{{ defaults.insurance }}">
+                </div>
+                <div class="form-group col-6">
+                    <label for="calc_other">Other Deductions (<span class="currency-display">{{ defaults.currency }}</span>)</label>
+                    <input type="number" step="5" id="calc_other" value="{{ defaults.other }}">
+                </div>
+            </div>
+
+            <div class="form-divider">
+                <span>Hours & Overtime (Optional)</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-4">
+                    <label for="calc_hours">Weekly Hours</label>
+                    <input type="number" step="1" id="calc_hours" value="40">
+                </div>
+                <div class="form-group col-4">
+                    <label for="calc_overtime_hours">Overtime Hours</label>
+                    <input type="number" step="1" id="calc_overtime_hours" value="0">
+                </div>
+                <div class="form-group col-4">
+                    <label for="calc_overtime_mult">OT Multiplier</label>
+                    <select id="calc_overtime_mult">
+                        <option value="1.5">1.5x (Standard)</option>
+                        <option value="2.0">2.0x (Double)</option>
+                        <option value="1.0">1.0x (Straight)</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Live Calculation Results & Multi-Horizon Table -->
+    <div>
+        <!-- Highlight Result Box -->
+        <div class="card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(99, 102, 241, 0.1)); border-color: rgba(16, 185, 129, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Net Monthly Take-Home</span>
+                    <div id="res_monthly_net" style="font-size: 2.25rem; font-weight: 800; font-family: var(--font-heading); color: var(--success); margin: 0.25rem 0;">
+                        {{ defaults.currency }}0.00
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Monthly Gross: <strong id="res_monthly_gross" style="color: var(--text-primary);">{{ defaults.currency }}0.00</strong>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kpi-icon-wrap success" style="margin-left: auto; width: 48px; height: 48px; font-size: 1.35rem;">
+                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem; font-weight: 700; color: var(--success);" id="res_retention_badge">
+                        80.5% Retained
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 Horizon Conversion Grid -->
+        <div class="grid-2" style="margin-bottom: 1.5rem;">
+            <!-- Weekly -->
+            <div class="kpi-card" style="margin-bottom: 0;">
+                <span class="kpi-title">Weekly Equivalent</span>
+                <div class="kpi-value" id="res_weekly_net" style="font-size: 1.4rem; color: var(--text-primary);">{{ defaults.currency }}0.00</div>
+                <div class="kpi-meta">Gross: <span id="res_weekly_gross">{{ defaults.currency }}0.00</span></div>
+            </div>
+
+            <!-- Bi-Weekly -->
+            <div class="kpi-card" style="margin-bottom: 0;">
+                <span class="kpi-title">Bi-Weekly (26 Pay Periods)</span>
+                <div class="kpi-value" id="res_biweekly_net" style="font-size: 1.4rem; color: var(--text-primary);">{{ defaults.currency }}0.00</div>
+                <div class="kpi-meta">Gross: <span id="res_biweekly_gross">{{ defaults.currency }}0.00</span></div>
+            </div>
+
+            <!-- Annual / Yearly -->
+            <div class="kpi-card" style="margin-bottom: 0;">
+                <span class="kpi-title">Annual Take-Home</span>
+                <div class="kpi-value" id="res_yearly_net" style="font-size: 1.4rem; color: var(--text-primary);">{{ defaults.currency }}0.00</div>
+                <div class="kpi-meta">Gross: <span id="res_yearly_gross">{{ defaults.currency }}0.00</span></div>
+            </div>
+
+            <!-- Hourly / Daily -->
+            <div class="kpi-card" style="margin-bottom: 0;">
+                <span class="kpi-title">Hourly Rate</span>
+                <div class="kpi-value" id="res_hourly_net" style="font-size: 1.4rem; color: var(--text-primary);">{{ defaults.currency }}0.00/hr</div>
+                <div class="kpi-meta">Daily: <span id="res_daily_net">{{ defaults.currency }}0.00</span></div>
+            </div>
+        </div>
+
+        <!-- Chart Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Real-time Breakdown Visualizer</h3>
+                <span class="badge badge-primary">Live</span>
+            </div>
+            <div class="chart-container" style="position: relative; height: 220px;">
+                <canvas id="liveCalcDonutChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script id="calc-defaults" type="application/json">
+    {{ defaults | tojson }}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/calculator.js') }}"></script>
+{% endblock %}

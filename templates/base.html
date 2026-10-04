@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RevTrack — Revenue & Salary Management{% endblock %}</title>
+    <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome 6 Free CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Chart.js 4.4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Custom Design System CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="app-body">
+    <!-- App Container -->
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        {% if current_user %}
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="{{ url_for('dashboard') }}" class="brand-link">
+                    <div class="brand-icon">
+                        <i class="fa-solid fa-chart-line-up"></i>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-title">RevTrack</span>
+                        <span class="brand-subtitle">Revenue Intelligence</span>
+                    </div>
+                </a>
+                <button class="sidebar-toggle-btn mobile-only" id="sidebarCloseBtn" aria-label="Close Sidebar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Workspace Mode Switcher -->
+            <div class="workspace-pill-container">
+                <div class="workspace-label">Workspace Mode</div>
+                <div class="workspace-switcher">
+                    <a href="{{ url_for('dashboard') }}" class="pill-btn {% if request.endpoint == 'dashboard' %}active{% endif %}" title="Personal Salary View">
+                        <i class="fa-solid fa-user"></i> Personal
+                    </a>
+                    <a href="{{ url_for('family_view') }}" class="pill-btn {% if request.endpoint == 'family_view' %}active{% endif %}" title="Family Household View">
+                        <i class="fa-solid fa-people-roof"></i> Family
+                        {% if current_user.family_id %}
+                        <span class="indicator-dot"></span>
+                        {% endif %}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Navigation Links -->
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Navigation</div>
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span>Personal Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('family_view') }}" class="nav-link {% if request.endpoint == 'family_view' %}active{% endif %}">
+                            <i class="fa-solid fa-house-chimney-user"></i>
+                            <span>Family Household</span>
+                            {% if current_user.family %}
+                            <span class="badge badge-success">{{ current_user.family.name.split()[0] }}</span>
+                            {% else %}
+                            <span class="badge badge-subtle">Join</span>
+                            {% endif %}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('calculator_page') }}" class="nav-link {% if request.endpoint == 'calculator_page' %}active{% endif %}">
+                            <i class="fa-solid fa-calculator"></i>
+                            <span>Salary Calculator</span>
+                            <span class="badge badge-primary">Simulate</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('records') }}" class="nav-link {% if request.endpoint == 'records' %}active{% endif %}">
+                            <i class="fa-solid fa-file-invoice-dollar"></i>
+                            <span>Pay Slips & Records</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="nav-section-title">Actions & Exports</div>
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="javascript:void(0)" class="nav-link" onclick="openModal('addSlipModal')">
+                            <i class="fa-solid fa-circle-plus text-accent"></i>
+                            <span>Add Salary Record</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('export_csv') }}" class="nav-link">
+                            <i class="fa-solid fa-file-arrow-down"></i>
+                            <span>Export Records (CSV)</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- User Footer Profile Card -->
+            <div class="sidebar-footer">
+                <div class="user-card" onclick="openModal('profileSettingsModal')">
+                    <div class="user-avatar">
+                        {{ current_user.name[:1] }}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">{{ current_user.name }}</div>
+                        <div class="user-meta">{{ current_user.job_title }}</div>
+                    </div>
+                    <button class="settings-trigger-btn" title="Salary Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+                <div class="sidebar-footer-actions">
+                    <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode">
+                        <i class="fa-solid fa-moon dark-icon"></i>
+                        <i class="fa-solid fa-sun light-icon"></i>
+                    </button>
+                    <a href="{{ url_for('logout') }}" class="logout-link" title="Sign Out">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Main Workspace -->
+        <main class="main-content {% if not current_user %}no-sidebar{% endif %}">
+            <!-- Top Navbar for Mobile & Header Actions -->
+            <header class="top-navbar">
+                {% if current_user %}
+                <button class="mobile-nav-toggle mobile-only" id="sidebarOpenBtn" aria-label="Open Sidebar">
+                    <i class="fa-solid fa-bars-staggered"></i>
+                </button>
+                {% else %}
+                <a href="{{ url_for('index') }}" class="brand-link">
+                    <div class="brand-icon">
+                        <i class="fa-solid fa-chart-line-up"></i>
+                    </div>
+                    <span class="brand-title">RevTrack</span>
+                </a>
+                {% endif %}
+
+                <div class="navbar-center">
+                    {% block page_heading %}{% endblock %}
+                </div>
+
+                <div class="navbar-actions">
+                    {% if current_user %}
+                    <button class="btn btn-outline btn-sm" onclick="openModal('addSlipModal')">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>New Pay Slip</span>
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('profileSettingsModal')">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Salary Settings</span>
+                    </button>
+                    {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm">Sign In</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Get Started</a>
+                    {% endif %}
+                </div>
+            </header>
+
+            <!-- Flash Alert Messages -->
+            <div class="flash-container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash-alert alert-{{ category }}">
+                                <div class="flash-icon">
+                                    {% if category == 'success' %}
+                                        <i class="fa-solid fa-circle-check"></i>
+                                    {% elif category == 'danger' %}
+                                        <i class="fa-solid fa-circle-exclamation"></i>
+                                    {% elif category == 'warning' %}
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                    {% else %}
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    {% endif %}
+                                </div>
+                                <span class="flash-text">{{ message }}</span>
+                                <button class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Page Body Content -->
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+
+            <!-- Footer -->
+            <footer class="app-footer">
+                <div class="footer-left">
+                    <span>&copy; {{ current_year }} RevTrack — Professional Revenue & Salary Management</span>
+                </div>
+                <div class="footer-right">
+                    <span class="tech-badge"><i class="fa-brands fa-python"></i> Python & Flask</span>
+                    <span class="tech-badge"><i class="fa-solid fa-database"></i> SQLite / PostgreSQL</span>
+                    <span class="tech-badge"><i class="fa-solid fa-cloud"></i> Render Ready</span>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    {% if current_user %}
+    <!-- ================= ADD SALARY RECORD MODAL ================= -->
+    <div class="modal-overlay" id="addSlipModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon"><i class="fa-solid fa-receipt"></i></div>
+                    <h3>Add Salary or Revenue Record</h3>
+                </div>
+                <button class="modal-close-btn" onclick="closeModal('addSlipModal')">&times;</button>
+            </div>
+            <form action="{{ url_for('add_record') }}" method="POST" class="modal-form">
+                <div class="form-row">
+                    <div class="form-group col-8">
+                        <label for="record_title">Title / Description</label>
+                        <input type="text" id="record_title" name="title" placeholder="e.g. October 2026 Salary, Freelance Sprint" required>
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="record_category">Category</label>
+                        <select id="record_category" name="category">
+                            <option value="primary_job">Primary Job</option>
+                            <option value="side_hustle">Side Hustle</option>
+                            <option value="freelance">Freelance</option>
+                            <option value="bonus">Bonus / Award</option>
+                            <option value="investment">Investment / Dividend</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="record_pay_date">Payment Date</label>
+                        <input type="date" id="record_pay_date" name="pay_date" value="{{ now.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="record_frequency">Frequency Type</label>
+                        <select id="record_frequency" name="frequency">
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-Weekly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="bonus">One-Time / Bonus</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-divider">
+                    <span>Income Components ({{ current_user.currency }})</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="record_gross">Base Gross Salary</label>
+                        <input type="number" step="0.01" id="record_gross" name="gross_amount" placeholder="0.00" value="{{ current_user.profile.base_salary if current_user.profile else 5000.0 }}" required>
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="record_allowances">Allowances / HRA / Perks</label>
+                        <input type="number" step="0.01" id="record_allowances" name="allowances" placeholder="0.00" value="{{ current_user.profile.allowances if current_user.profile else 0.0 }}">
+                    </div>
+                </div>
+
+                <div class="form-divider">
+                    <span>Itemized Deductions ({{ current_user.currency }})</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-3">
+                        <label for="record_tax">Income Tax</label>
+                        <input type="number" step="0.01" id="record_tax" name="tax_deduction" placeholder="0.00">
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="record_pension">Pension / 401k</label>
+                        <input type="number" step="0.01" id="record_pension" name="pension_deduction" placeholder="0.00">
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="record_insurance">Insurance</label>
+                        <input type="number" step="0.01" id="record_insurance" name="insurance_deduction" placeholder="0.00">
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="record_other">Other</label>
+                        <input type="number" step="0.01" id="record_other" name="other_deductions" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="record_notes">Notes & Pay Stub Reference (Optional)</label>
+                    <textarea id="record_notes" name="notes" rows="2" placeholder="Reference pay stub number, overtime details, or tax notes..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addSlipModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Salary Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= SALARY PROFILE SETTINGS MODAL ================= -->
+    <div class="modal-overlay" id="profileSettingsModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon"><i class="fa-solid fa-sliders"></i></div>
+                    <h3>Salary Profile & Preferences</h3>
+                </div>
+                <button class="modal-close-btn" onclick="closeModal('profileSettingsModal')">&times;</button>
+            </div>
+            <form action="{{ url_for('update_profile') }}" method="POST" class="modal-form">
+                <div class="form-row">
+                    <div class="form-group col-4">
+                        <label for="user_name">Full Name</label>
+                        <input type="text" id="user_name" name="name" value="{{ current_user.name }}" required>
+                    </div>
+                    <div class="form-group col-5">
+                        <label for="job_title">Job Title</label>
+                        <input type="text" id="job_title" name="job_title" value="{{ current_user.job_title }}" required>
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="currency_select">Currency</label>
+                        <select id="currency_select" name="currency">
+                            <option value="$" {% if current_user.currency == '$' %}selected{% endif %}>USD ($)</option>
+                            <option value="₹" {% if current_user.currency == '₹' %}selected{% endif %}>INR (₹)</option>
+                            <option value="€" {% if current_user.currency == '€' %}selected{% endif %}>EUR (€)</option>
+                            <option value="£" {% if current_user.currency == '£' %}selected{% endif %}>GBP (£)</option>
+                            <option value="C$" {% if current_user.currency == 'C$' %}selected{% endif %}>CAD ($)</option>
+                            <option value="A$" {% if current_user.currency == 'A$' %}selected{% endif %}>AUD ($)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-divider">
+                    <span>Baseline Compensation (Recurring)</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="prof_frequency">Payment Cadence</label>
+                        <select id="prof_frequency" name="pay_frequency">
+                            <option value="monthly" {% if current_user.profile.pay_frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+                            <option value="weekly" {% if current_user.profile.pay_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                            <option value="biweekly" {% if current_user.profile.pay_frequency == 'biweekly' %}selected{% endif %}>Bi-Weekly</option>
+                            <option value="yearly" {% if current_user.profile.pay_frequency == 'yearly' %}selected{% endif %}>Yearly (Annual)</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="prof_base">Base Salary Amount</label>
+                        <input type="number" step="0.01" id="prof_base" name="base_salary" value="{{ current_user.profile.base_salary }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="prof_allowances">Allowances / HRA</label>
+                        <input type="number" step="0.01" id="prof_allowances" name="allowances" value="{{ current_user.profile.allowances }}">
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="prof_bonus">Target Expected Bonus</label>
+                        <input type="number" step="0.01" id="prof_bonus" name="bonus_expected" value="{{ current_user.profile.bonus_expected }}">
+                    </div>
+                </div>
+
+                <div class="form-divider">
+                    <span>Standard Tax & Deductions Rates</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="prof_tax">Estimated Tax Rate (%)</label>
+                        <input type="number" step="0.1" id="prof_tax" name="tax_rate" value="{{ current_user.profile.tax_rate }}">
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="prof_pension">Pension / 401(k) / PF Rate (%)</label>
+                        <input type="number" step="0.1" id="prof_pension" name="pension_rate" value="{{ current_user.profile.pension_rate }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="prof_insurance">Insurance Deduction (Fixed)</label>
+                        <input type="number" step="0.01" id="prof_insurance" name="insurance_deduction" value="{{ current_user.profile.insurance_deduction }}">
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="prof_other">Other Deductions (Fixed)</label>
+                        <input type="number" step="0.01" id="prof_other" name="other_deductions" value="{{ current_user.profile.other_deductions }}">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('profileSettingsModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

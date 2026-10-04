@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account — RevTrack{% endblock %}
+
+{% block content %}
+<div style="min-height: 85vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div class="card" style="width: 100%; max-width: 520px; padding: 2.5rem; border-color: rgba(99, 102, 241, 0.25); box-shadow: var(--shadow-lg);">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <div class="brand-icon" style="width: 54px; height: 54px; margin: 0 auto 1rem auto; font-size: 1.5rem;">
+                <i class="fa-solid fa-chart-line-up"></i>
+            </div>
+            <h2 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px;">Get Started with RevTrack</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Create your personal or family revenue workspace</p>
+        </div>
+
+        <form action="{{ url_for('register') }}" method="POST">
+            <div class="form-row">
+                <div class="form-group col-7">
+                    <label for="reg_name"><i class="fa-solid fa-user"></i> Full Name</label>
+                    <input type="text" id="reg_name" name="name" placeholder="Alex Morgan" required>
+                </div>
+                <div class="form-group col-5">
+                    <label for="reg_currency"><i class="fa-solid fa-coins"></i> Currency</label>
+                    <select id="reg_currency" name="currency">
+                        <option value="$" selected>USD ($)</option>
+                        <option value="₹">INR (₹)</option>
+                        <option value="€">EUR (€)</option>
+                        <option value="£">GBP (£)</option>
+                        <option value="C$">CAD (C$)</option>
+                        <option value="A$">AUD (A$)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-6">
+                    <label for="reg_email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+                    <input type="email" id="reg_email" name="email" placeholder="alex@company.com" required>
+                </div>
+                <div class="form-group col-6">
+                    <label for="reg_job"><i class="fa-solid fa-briefcase"></i> Job Title</label>
+                    <input type="text" id="reg_job" name="job_title" placeholder="Software Engineer">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="reg_password"><i class="fa-solid fa-lock"></i> Password</label>
+                <input type="password" id="reg_password" name="password" placeholder="Create a strong password" required minlength="6">
+            </div>
+
+            <!-- Account / Family Mode Selection -->
+            <div class="form-divider">
+                <span>Account Mode</span>
+            </div>
+
+            <div class="form-group">
+                <label>Choose Workspace Type</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.25rem;">
+                    <label style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem; text-align: center; cursor: pointer;" id="label_personal">
+                        <input type="radio" name="account_type" value="personal" checked onchange="toggleFamilyInputs('personal')" style="display: none;">
+                        <i class="fa-solid fa-user" style="display: block; margin-bottom: 0.25rem; color: var(--primary);"></i>
+                        <span style="font-size: 0.75rem; font-weight: 600;">Personal</span>
+                    </label>
+                    <label style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem; text-align: center; cursor: pointer;" id="label_create_family">
+                        <input type="radio" name="account_type" value="create_family" onchange="toggleFamilyInputs('create_family')" style="display: none;">
+                        <i class="fa-solid fa-house-chimney-medical" style="display: block; margin-bottom: 0.25rem; color: var(--accent);"></i>
+                        <span style="font-size: 0.75rem; font-weight: 600;">New Family</span>
+                    </label>
+                    <label style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem; text-align: center; cursor: pointer;" id="label_join_family">
+                        <input type="radio" name="account_type" value="join_family" onchange="toggleFamilyInputs('join_family')" style="display: none;">
+                        <i class="fa-solid fa-key" style="display: block; margin-bottom: 0.25rem; color: var(--success);"></i>
+                        <span style="font-size: 0.75rem; font-weight: 600;">Join Family</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Conditional Family Fields -->
+            <div id="create_family_section" style="display: none; background: var(--bg-input); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-color);">
+                <label for="family_name_input" style="font-size: 0.8rem; font-weight: 600;"><i class="fa-solid fa-people-roof"></i> Household Name</label>
+                <input type="text" id="family_name_input" name="family_name" placeholder="e.g. Morgan Household">
+            </div>
+
+            <div id="join_family_section" style="display: none; background: var(--bg-input); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-color);">
+                <label for="invite_code_input" style="font-size: 0.8rem; font-weight: 600;"><i class="fa-solid fa-ticket"></i> Enter 8-Character Family Invite Code</label>
+                <input type="text" id="invite_code_input" name="invite_code" placeholder="e.g. MORG-2026" style="text-transform: uppercase; font-family: monospace; letter-spacing: 1px;">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.75rem;">
+                <i class="fa-solid fa-user-plus"></i> Create Account
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.75rem; font-size: 0.85rem; color: var(--text-secondary);">
+            Already have an account? 
+            <a href="{{ url_for('login') }}" style="font-weight: 600; color: var(--primary);">Sign In</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleFamilyInputs(type) {
+        document.getElementById('create_family_section').style.display = (type === 'create_family') ? 'block' : 'none';
+        document.getElementById('join_family_section').style.display = (type === 'join_family') ? 'block' : 'none';
+
+        ['personal', 'create_family', 'join_family'].forEach(t => {
+            const el = document.getElementById('label_' + t);
+            if (t === type) {
+                el.style.borderColor = 'var(--primary)';
+                el.style.background = 'rgba(99, 102, 241, 0.1)';
+            } else {
+                el.style.borderColor = 'var(--border-color)';
+                el.style.background = 'transparent';
+            }
+        });
+    }
+    toggleFamilyInputs('personal');
+</script>
+{% endblock %}

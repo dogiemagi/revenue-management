@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}{{ family.name }} — Family Revenue Intelligence{% endblock %}
+
+{% block page_heading %}
+<div class="page-title-box">
+    <h2>{{ family.name }}</h2>
+    <span class="page-subtitle">Household Revenue & Multi-Earner Analytics</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Family Header Banner & Invite Code -->
+<div class="card" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08)); border-color: rgba(99, 102, 241, 0.25);">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 52px; height: 52px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fff;">
+                <i class="fa-solid fa-people-roof"></i>
+            </div>
+            <div>
+                <h3 style="font-size: 1.35rem; font-weight: 800;">{{ family.name }}</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <span><i class="fa-solid fa-users"></i> {{ members_data|length }} Family Members</span> · 
+                    <span>Created {{ family.created_at.strftime('%B %Y') }}</span>
+                </p>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="invite-box" style="display: flex; align-items: center; background: var(--bg-input); padding: 0.4rem 0.85rem; border-radius: var(--radius-md); border: 1px dashed var(--primary);">
+                <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Family Invite Code:</span>
+                <strong id="inviteCodeText" style="font-family: monospace; font-size: 1rem; color: var(--primary); letter-spacing: 1px;">{{ family.invite_code }}</strong>
+                <button class="btn btn-outline btn-sm" onclick="copyInviteCode()" style="margin-left: 0.5rem; padding: 0.25rem 0.5rem;" title="Copy Invite Code">
+                    <i class="fa-regular fa-copy"></i>
+                </button>
+            </div>
+
+            <form action="{{ url_for('leave_family') }}" method="POST" onsubmit="return confirm('Are you sure you want to leave this family group?');">
+                <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); border-color: rgba(244, 63, 94, 0.3);">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Leave
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Top Family KPI Cards -->
+<div class="kpi-grid">
+    <!-- Combined Monthly Household Take-Home -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Combined Monthly Net</span>
+            <div class="kpi-icon-wrap success">
+                <i class="fa-solid fa-house-chimney-dollar"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(total_monthly_net) }}</div>
+        <div class="kpi-meta">
+            <span class="trend-up"><i class="fa-solid fa-check"></i> Available Household Budget</span>
+        </div>
+    </div>
+
+    <!-- Combined Monthly Gross -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Combined Monthly Gross</span>
+            <div class="kpi-icon-wrap primary">
+                <i class="fa-solid fa-money-bill-trend-up"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(total_monthly_gross) }}</div>
+        <div class="kpi-meta">
+            <span>Taxes: {{ user.currency }}{{ "{:,.2f}".format(total_monthly_tax) }}/mo</span>
+        </div>
+    </div>
+
+    <!-- Combined Annual Projected Net -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Combined Annual Net</span>
+            <div class="kpi-icon-wrap warning">
+                <i class="fa-solid fa-coins"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ user.currency }}{{ "{:,.2f}".format(total_annual_net) }}</div>
+        <div class="kpi-meta">
+            <span>Annual Gross: {{ user.currency }}{{ "{:,.2f}".format(total_annual_gross) }}</span>
+        </div>
+    </div>
+
+    <!-- Active Earners -->
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <span class="kpi-title">Contributing Members</span>
+            <div class="kpi-icon-wrap info">
+                <i class="fa-solid fa-user-group"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ active_earners }} / {{ members_data|length }}</div>
+        <div class="kpi-meta">
+            <span>Avg / Member: {{ user.currency }}{{ "{:,.2f}".format(total_monthly_net / (active_earners if active_earners > 0 else 1)) }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Family Visualizations -->
+<div class="grid-2">
+    <!-- Chart 1: Member Contribution Donut -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Revenue Contribution Share</h3>
+                <p class="card-subtitle">Percentage contribution to total household take-home</p>
+            </div>
+            <span class="badge badge-success">Live Share</span>
+        </div>
+        <div class="chart-container" style="position: relative; height: 280px;">
+            <canvas id="familyDonutChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 2: Member Gross vs Net Comparison Bar Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title"><i class="fa-solid fa-chart-column"></i> Member Compensation Comparison</h3>
+                <p class="card-subtitle">Monthly Gross vs Monthly Net per earner</p>
+            </div>
+            <span class="badge badge-primary">Monthly</span>
+        </div>
+        <div class="chart-container" style="position: relative; height: 280px;">
+            <canvas id="familyBarChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Family Members Directory Table -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title"><i class="fa-solid fa-address-book"></i> Household Members & Compensation Details</h3>
+            <p class="card-subtitle">All members registered in this family workspace</p>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+            Share code <strong>{{ family.invite_code }}</strong> for new members to join
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Member</th>
+                    <th>Job Title</th>
+                    <th>Monthly Gross</th>
+                    <th>Monthly Take-Home</th>
+                    <th>Household Share</th>
+                    <th>Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members_data %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                {{ m.user.name[:1] }}
+                            </div>
+                            <div>
+                                <strong>{{ m.user.name }}</strong>
+                                {% if m.user.id == user.id %}
+                                <span class="badge badge-primary" style="margin-left: 0.25rem;">You</span>
+                                {% endif %}
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ m.user.email }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ m.user.job_title }}</td>
+                    <td>{{ user.currency }}{{ "{:,.2f}".format(m.monthly_gross) }}</td>
+                    <td class="amount-positive">{{ user.currency }}{{ "{:,.2f}".format(m.monthly_net) }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="flex: 1; height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; min-width: 60px;">
+                                <div style="width: {{ m.contribution_pct }}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent));"></div>
+                            </div>
+                            <span style="font-size: 0.8rem; font-weight: 600;">{{ m.contribution_pct }}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if m.user.is_family_admin %}
+                        <span class="badge badge-primary"><i class="fa-solid fa-crown"></i> Head of Family</span>
+                        {% else %}
+                        <span class="badge badge-subtle">Member</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function copyInviteCode() {
+        const code = document.getElementById('inviteCodeText').innerText;
+        navigator.clipboard.writeText(code).then(() => {
+            alert('Family Invite Code ' + code + ' copied to clipboard! Share it with your family members.');
+        });
+    }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/family_charts.js') }}"></script>
+{% endblock %}
