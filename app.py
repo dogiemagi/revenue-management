@@ -830,7 +830,7 @@ def complete_onboarding():
                     category=cat,
                     title=title,
                     amount=amt,
-                    cadence='monthly',
+                    recurrence='monthly',
                     expense_date=today
                 ))
         except ValueError:
