@@ -8,9 +8,12 @@ class Config:
     # Support both PostgreSQL on Render/Neon/Supabase and local SQLite
     database_url = os.environ.get('DATABASE_URL')
     if database_url:
-        # Render sometimes provides postgres:// which SQLAlchemy 1.4+ expects as postgresql://
+        # Normalise legacy postgres:// prefix
         if database_url.startswith("postgres://"):
             database_url = database_url.replace("postgres://", "postgresql://", 1)
+        # Force psycopg2 driver — avoids "No module named 'psycopg'" on Python 3.14
+        if database_url.startswith("postgresql://") and "+" not in database_url.split("://")[0]:
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
         SQLALCHEMY_DATABASE_URI = database_url
     else:
         # Default to local SQLite database in the app directory
