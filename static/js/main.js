@@ -3,6 +3,22 @@
  * Handles Modal Dialogs, Theme Switching, Sidebar Toggle, and Clipboard.
  */
 
+// Password visibility toggle
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('i');
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+        btn.title = 'Hide password';
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+        btn.title = 'Show password';
+    }
+}
+
 // Modal Management
 function openModal(modalId) {
     const modal = document.getElementById(modalId);

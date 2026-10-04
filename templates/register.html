@@ -45,7 +45,13 @@
 
             <div class="form-group">
                 <label for="reg_password"><i class="fa-solid fa-lock"></i> Password</label>
-                <input type="password" id="reg_password" name="password" placeholder="Create a secure password" required minlength="6">
+                <div style="position: relative;">
+                    <input type="password" id="reg_password" name="password" placeholder="Create a secure password" required minlength="6" style="padding-right: 2.75rem;">
+                    <button type="button" onclick="togglePasswordVisibility('reg_password', this)" tabindex="-1"
+                        style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0; font-size: 1rem; line-height: 1;" title="Show/hide password">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- Account / Family Mode Selection -->
