@@ -676,6 +676,8 @@ const toggleSide = () => {
 $('#menu').onclick = toggleSide; $('#collapse').onclick = toggleSide;
 hydrateIcons();
 
+{ const yr = $('#year'); if (yr) yr.textContent = new Date().getFullYear(); }
+
 // ---------- custom dropdowns (enhance every <select>; native select stays in sync underneath) ----------
 let openCS = null;
 function closeCS() {
