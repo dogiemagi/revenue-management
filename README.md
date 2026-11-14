@@ -2,6 +2,10 @@
 
 Full-stack personal finance manager: salary engine, pay slips, spending, investments, growth planning and a family workspace.
 
+**Live app:** https://revtrack-hrg1.onrender.com/#/dashboard
+
+Hosted on Render's free tier, so the first visit after a quiet period can take about a minute to wake up. Click *Explore with demo account* to look around without signing up.
+
 | Layer | Tech |
 |---|---|
 | Frontend | HTML + CSS + vanilla JS (`public/`), hand-written SVG charts and icons |

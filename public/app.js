@@ -745,5 +745,33 @@ addEventListener('scroll', e => { if (openCS && !(e.target.closest && e.target.c
 new MutationObserver(enhanceAll).observe(document.body, {childList: true, subtree: true});
 enhanceAll();
 
+// ---------- cursor effects: trailing ring, click ripple, card spotlight (off on touch / reduced motion) ----------
+(() => {
+  if (!matchMedia('(pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const ring = document.createElement('div'); ring.className = 'cur-ring'; document.body.appendChild(ring);
+  const HOT = 'a, button, select, [data-act], .cs-btn, .cs-opt, label.lbl, .card.kpi, nav a';
+  let mx = 0, my = 0, rx = 0, ry = 0, shown = false;
+  addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    if (!shown) { shown = true; rx = mx; ry = my; ring.style.opacity = 1; }
+    const el = e.target.closest ? e.target : null;
+    ring.classList.toggle('hot', !!(el && el.closest(HOT)));
+    ring.classList.toggle('text', !!(el && el.closest('input:not([type=range]), textarea')));
+    const card = el && el.closest('.card');
+    if (card) { const r = card.getBoundingClientRect(); card.style.setProperty('--mx', (e.clientX - r.left) + 'px'); card.style.setProperty('--my', (e.clientY - r.top) + 'px'); }
+  }, {passive: true});
+  document.documentElement.addEventListener('mouseleave', () => { ring.style.opacity = 0; shown = false; });
+  addEventListener('mousedown', () => ring.classList.add('down'));
+  addEventListener('mouseup', () => ring.classList.remove('down'));
+  addEventListener('click', e => {
+    const d = document.createElement('div'); d.className = 'cur-ripple'; d.style.left = e.clientX + 'px'; d.style.top = e.clientY + 'px';
+    document.body.appendChild(d); setTimeout(() => d.remove(), 600);
+  });
+  (function loop() {
+    rx += (mx - rx) * 0.2; ry += (my - ry) * 0.2;
+    ring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+    requestAnimationFrame(loop);
+  })();
+})();
 api('GET', '/api/state').then(s => { S = s; sortTx(); sortSlips(); route(); }).catch(() => { S = null; route(); });
 })();
