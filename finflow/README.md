@@ -2,24 +2,45 @@
 
 Full-stack personal finance manager: salary engine, pay slips, spending, investments, growth planning and a family workspace.
 
-**Stack:** Node.js 22.13+ (built-in `node:sqlite`, `crypto`, `http`) — zero npm dependencies. Vanilla JS frontend with hand-rolled SVG charts.
+| Layer | Tech |
+|---|---|
+| Frontend | HTML + CSS + vanilla JS (`public/`), hand-written SVG charts and icons |
+| Backend | **FastAPI** (Python 3.10+), Pydantic validation, REST API under `/api` |
+| Database | SQLAlchemy 2 on SQLite (set `DATABASE_URL` for Postgres) |
+| Auth | scrypt password hashing, signed HttpOnly session cookie |
 
 ## Run
 ```
-node server.js        # http://127.0.0.1:3000
-node test.js          # 17 API tests on a throwaway database
+run.bat                                   # Windows: sets up .venv, installs deps, opens the browser
 ```
-Env: `PORT`, `HOST` (use `0.0.0.0` to expose), `SECRET` (cookie signing key; otherwise generated in `data/secret.key`), `DB_FILE`.
+or manually:
+```
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python -m uvicorn backend.main:app --port 3000
+```
+Open http://localhost:3000 · interactive API docs at http://localhost:3000/docs
+
+Tests (19, throwaway database): `.venv\Scripts\python -m pytest -q`
+
+Env vars: `DATABASE_URL`, `DB_FILE`, `SECRET` (cookie signing key; otherwise generated in `data/secret.key`), `COOKIE_SECURE=1` (behind HTTPS).
 
 ## Structure
-- `server.js` – REST API, auth (scrypt + signed HttpOnly cookie), SQLite schema, static hosting
-- `calc.js` – multi-cadence salary engine (weekly / bi-weekly / monthly / yearly / hourly, deductions, overtime)
-- `public/` – SPA (`index.html`, `app.js`, `styles.css`)
-- `data/` – SQLite database and secret (git-ignored)
+```
+backend/
+  main.py       routes, auth dependency, error handling, security headers, static hosting
+  schemas.py    Pydantic request models (all validation)
+  models.py     SQLAlchemy models + engine
+  services.py   settings, state assembly, family aggregation, demo seed
+  calc.py       multi-cadence salary engine (weekly / bi-weekly / monthly / yearly / hourly)
+  security.py   scrypt, signed tokens, rate limiting
+public/         index.html, app.js, styles.css
+tests/          pytest end-to-end API tests
+```
 
 ## Ideas adopted from dogiemagi/revenue-management
-Salary engine, pay slips with print view + CSV export, accounts, family workspace with invite codes, demo account.
+Salary engine, pay slips with print view + CSV export, accounts, family workspace with invite codes, demo account, bulk expense entry.
 
 ## Notes
-- Demo account is shared by everyone who clicks it; use "Reset demo data" to restore it. Don't expose it publicly with real data.
-- For public deployment: put behind HTTPS and add the `Secure` cookie flag in `setCookie`.
+- The demo account is shared by everyone who clicks it; "Reset demo data" restores it.
+- For public deployment use HTTPS and set `COOKIE_SECURE=1`.

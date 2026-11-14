@@ -136,6 +136,17 @@ const bar = (v, max, cls = '') => `<div class="bar ${cls}"><i style="width:${Mat
 // ---------- pages ----------
 const pages = {};
 pages.auth = () => `
+  <div class="authwrap">
+  <section class="hero-copy">
+    <span class="eyebrow">${ic('trending-up')} FinFlow</span>
+    <h1>Know where your money goes.<br><span class="grad">Plan where it grows.</span></h1>
+    <p class="lead">Track your salary, spending and investments in one place, then see how your wealth can grow year by year.</p>
+    <ul class="points">
+      <li><span class="pi">${ic('pie')}</span><div><b>Clear visuals</b><span>Every rupee shown in charts you can read at a glance.</span></div></li>
+      <li><span class="pi">${ic('shield')}</span><div><b>Private by default</b><span>Your records are visible only to you. Family sharing exposes salary totals, nothing else.</span></div></li>
+      <li><span class="pi">${ic('trending-up')}</span><div><b>Growth you can plan</b><span>Project your wealth with three scenarios, adjusted for inflation.</span></div></li>
+    </ul>
+  </section>
   <div class="card auth">
     <button type="button" class="btn sm ghost auththeme" data-act="auththeme" aria-label="Toggle light / dark theme" title="Toggle light / dark theme">${ic('sun')}</button>
     <div class="brand"><span class="logo">${ic('trending-up')}</span> FinFlow</div>
@@ -149,6 +160,7 @@ pages.auth = () => `
       <div class="err" id="autherr2"></div><button class="btn primary">Create account</button></form>
     <div class="row" style="margin:14px 0 8px"><hr style="flex:1;border-color:var(--line)"><span class="mut">or</span><hr style="flex:1;border-color:var(--line)"></div>
     <button class="btn" style="width:100%" data-act="demo">${ic('sparkles')} Explore with demo account</button>
+  </div>
   </div>`;
 
 pages.dashboard = () => {
