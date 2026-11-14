@@ -335,6 +335,58 @@ def add_expense():
     flash(f"Expense '{title}' of {user.currency}{amount:,.2f} recorded!", "success")
     return redirect(request.referrer or url_for('expenses_view'))
 
+@app.route('/expenses/add-bulk', methods=['POST'])
+@login_required
+def add_bulk_expenses():
+    user = get_current_user()
+
+    titles = request.form.getlist('bulk_title[]')
+    amounts = request.form.getlist('bulk_amount[]')
+    categories = request.form.getlist('bulk_category[]')
+    dates = request.form.getlist('bulk_date[]')
+    recurrences = request.form.getlist('bulk_recurrence[]')
+    notes_list = request.form.getlist('bulk_notes[]')
+
+    count = 0
+    total_amount = 0.0
+
+    for i in range(len(titles)):
+        title = (titles[i] or 'Expense').strip()
+        if not title:
+            continue
+
+        try:
+            amount = float(amounts[i]) if i < len(amounts) else 0.0
+        except (ValueError, IndexError):
+            amount = 0.0
+
+        category = categories[i] if i < len(categories) else 'groceries'
+
+        try:
+            parsed_date = datetime.strptime(dates[i], '%Y-%m-%d').date() if i < len(dates) else datetime.utcnow().date()
+        except (ValueError, IndexError):
+            parsed_date = datetime.utcnow().date()
+
+        recurrence = recurrences[i] if i < len(recurrences) else 'one_time'
+        notes = (notes_list[i] if i < len(notes_list) else '').strip()
+
+        expense = ExpenseRecord(
+            user_id=user.id,
+            title=title,
+            category=category,
+            amount=amount,
+            expense_date=parsed_date,
+            recurrence=recurrence,
+            notes=notes or None
+        )
+        db.session.add(expense)
+        count += 1
+        total_amount += amount
+
+    db.session.commit()
+    flash(f"✅ {count} expense(s) totalling {user.currency}{total_amount:,.2f} saved in bulk!", "success")
+    return redirect(url_for('expenses_view'))
+
 @app.route('/expenses/<int:expense_id>/delete', methods=['POST'])
 @login_required
 def delete_expense(expense_id):

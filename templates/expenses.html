@@ -157,10 +157,15 @@
             </button>
         </div>
 
-        <!-- Add Expense CTA Button -->
-        <button class="btn btn-primary btn-sm" onclick="openModal('addExpenseModal')">
-            <i class="fa-solid fa-plus"></i> Add New Expense
-        </button>
+        <!-- Add Expense CTA Buttons -->
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-primary btn-sm" onclick="openModal('addExpenseModal')">
+                <i class="fa-solid fa-plus"></i> Single Expense
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="openModal('bulkExpenseModal')" style="border-color: rgba(139,92,246,0.4); color: #8b5cf6;">
+                <i class="fa-solid fa-layer-group"></i> Bulk Entry
+            </button>
+        </div>
     </div>
 </div>
 
@@ -451,6 +456,239 @@ function filterExpenses(cat, btnEl) {
         </form>
     </div>
 </div>
+
+<!-- ================= BULK ADD EXPENSES MODAL ================= -->
+<div class="modal-overlay" id="bulkExpenseModal">
+    <div class="modal-dialog" style="max-width: 900px; width: 95vw;">
+        <div class="modal-header">
+            <div class="modal-title-group">
+                <div class="modal-icon" style="background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.15)); color: #8b5cf6; border: 1px solid rgba(139,92,246,0.25);">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 700;">Bulk Expense Entry</h3>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">Add multiple expenses at once — perfect for weekend catch-up</p>
+                </div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal('bulkExpenseModal')">&times;</button>
+        </div>
+        <form action="{{ url_for('add_bulk_expenses') }}" method="POST" class="modal-form" id="bulkExpenseForm">
+            <!-- Bulk entries container -->
+            <div id="bulkEntriesContainer" style="max-height: 420px; overflow-y: auto; padding-right: 0.5rem;">
+                <!-- Row 1 (default) -->
+                <div class="bulk-expense-row" data-row="1" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 0.65rem; position: relative;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.55rem;">
+                        <span style="font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
+                            <i class="fa-solid fa-receipt"></i> Expense #1
+                        </span>
+                        <button type="button" class="bulk-remove-btn" onclick="removeBulkRow(this)" style="display:none; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.4rem; border-radius: 4px;" title="Remove this entry">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 140px 120px 130px; gap: 0.5rem; align-items: end;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Description</label>
+                            <input type="text" name="bulk_title[]" placeholder="e.g. Weekly Groceries" required style="font-size: 0.85rem; padding: 0.45rem 0.65rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Amount ({{ user.currency }})</label>
+                            <input type="number" step="0.01" name="bulk_amount[]" placeholder="0.00" required style="font-size: 0.85rem; padding: 0.45rem 0.65rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Category</label>
+                            <select name="bulk_category[]" style="font-size: 0.8rem; padding: 0.45rem 0.35rem;">
+                                <option value="groceries">🛒 Groceries</option>
+                                <option value="clothing">👕 Clothing</option>
+                                <option value="dining">🍽️ Dining</option>
+                                <option value="utilities">⚡ Utilities</option>
+                                <option value="housing">🏠 Housing</option>
+                                <option value="transportation">🚗 Transport</option>
+                                <option value="healthcare">❤️ Healthcare</option>
+                                <option value="other">🛍️ Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Date</label>
+                            <input type="date" name="bulk_date[]" value="{{ now.strftime('%Y-%m-%d') }}" required style="font-size: 0.8rem; padding: 0.45rem 0.35rem;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; margin-top: 0.45rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Cadence</label>
+                            <select name="bulk_recurrence[]" style="font-size: 0.8rem; padding: 0.45rem 0.35rem;">
+                                <option value="one_time">One-Time</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly" selected>Monthly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Notes (optional)</label>
+                            <input type="text" name="bulk_notes[]" placeholder="Store, invoice ref..." style="font-size: 0.85rem; padding: 0.45rem 0.65rem;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add more row button + summary -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-outline btn-sm" onclick="addBulkRow()" style="border-color: rgba(139,92,246,0.35); color: #8b5cf6;">
+                    <i class="fa-solid fa-plus"></i> Add Another Expense
+                </button>
+                <div id="bulkSummary" style="font-size: 0.8rem; color: var(--text-secondary);">
+                    <span id="bulkCount">1</span> expense(s) · Total: <strong style="color: var(--primary);"><span id="bulkTotalSymbol">{{ user.currency }}</span><span id="bulkTotal">0.00</span></strong>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="margin-top: 1rem;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('bulkExpenseModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check-double"></i> Save All Expenses</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ── Bulk Expense Entry Logic ──
+    let bulkRowCount = 1;
+
+    function addBulkRow() {
+        bulkRowCount++;
+        const container = document.getElementById('bulkEntriesContainer');
+        const today = '{{ now.strftime("%Y-%m-%d") }}';
+        const rowHTML = `
+        <div class="bulk-expense-row" data-row="${bulkRowCount}" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 0.65rem; position: relative; animation: fadeSlideIn 0.25s ease;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.55rem;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fa-solid fa-receipt"></i> Expense #${bulkRowCount}
+                </span>
+                <button type="button" class="bulk-remove-btn" onclick="removeBulkRow(this)" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.4rem; border-radius: 4px;" title="Remove this entry">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 140px 120px 130px; gap: 0.5rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Description</label>
+                    <input type="text" name="bulk_title[]" placeholder="e.g. Weekly Groceries" required style="font-size: 0.85rem; padding: 0.45rem 0.65rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Amount (${document.getElementById('bulkTotalSymbol').textContent})</label>
+                    <input type="number" step="0.01" name="bulk_amount[]" placeholder="0.00" required style="font-size: 0.85rem; padding: 0.45rem 0.65rem;" oninput="updateBulkTotal()">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Category</label>
+                    <select name="bulk_category[]" style="font-size: 0.8rem; padding: 0.45rem 0.35rem;">
+                        <option value="groceries">🛒 Groceries</option>
+                        <option value="clothing">👕 Clothing</option>
+                        <option value="dining">🍽️ Dining</option>
+                        <option value="utilities">⚡ Utilities</option>
+                        <option value="housing">🏠 Housing</option>
+                        <option value="transportation">🚗 Transport</option>
+                        <option value="healthcare">❤️ Healthcare</option>
+                        <option value="other">🛍️ Other</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Date</label>
+                    <input type="date" name="bulk_date[]" value="${today}" required style="font-size: 0.8rem; padding: 0.45rem 0.35rem;">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; margin-top: 0.45rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Cadence</label>
+                    <select name="bulk_recurrence[]" style="font-size: 0.8rem; padding: 0.45rem 0.35rem;">
+                        <option value="one_time">One-Time</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly" selected>Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; margin-bottom: 0.2rem;">Notes (optional)</label>
+                    <input type="text" name="bulk_notes[]" placeholder="Store, invoice ref..." style="font-size: 0.85rem; padding: 0.45rem 0.65rem;">
+                </div>
+            </div>
+        </div>`;
+        container.insertAdjacentHTML('beforeend', rowHTML);
+        updateBulkUI();
+        // Scroll to bottom of container
+        container.scrollTop = container.scrollHeight;
+        // Focus the new description field
+        const newRow = container.lastElementChild;
+        const descInput = newRow.querySelector('input[name="bulk_title[]"]');
+        if (descInput) descInput.focus();
+    }
+
+    function removeBulkRow(btn) {
+        const row = btn.closest('.bulk-expense-row');
+        row.style.animation = 'fadeSlideOut 0.2s ease forwards';
+        setTimeout(() => {
+            row.remove();
+            renumberBulkRows();
+            updateBulkUI();
+        }, 200);
+    }
+
+    function renumberBulkRows() {
+        const rows = document.querySelectorAll('#bulkEntriesContainer .bulk-expense-row');
+        rows.forEach((row, idx) => {
+            const label = row.querySelector('span');
+            if (label) label.innerHTML = `<i class="fa-solid fa-receipt"></i> Expense #${idx + 1}`;
+            row.dataset.row = idx + 1;
+        });
+        bulkRowCount = rows.length;
+    }
+
+    function updateBulkUI() {
+        const rows = document.querySelectorAll('#bulkEntriesContainer .bulk-expense-row');
+        // Show/hide remove buttons (hide if only 1 row)
+        rows.forEach(row => {
+            const removeBtn = row.querySelector('.bulk-remove-btn');
+            if (removeBtn) removeBtn.style.display = rows.length > 1 ? 'inline-flex' : 'none';
+        });
+        document.getElementById('bulkCount').textContent = rows.length;
+        updateBulkTotal();
+    }
+
+    function updateBulkTotal() {
+        const amounts = document.querySelectorAll('#bulkEntriesContainer input[name="bulk_amount[]"]');
+        let total = 0;
+        amounts.forEach(inp => { total += parseFloat(inp.value) || 0; });
+        document.getElementById('bulkTotal').textContent = total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Attach live total updates to the first row's amount field
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('bulkEntriesContainer').addEventListener('input', function(e) {
+            if (e.target.name === 'bulk_amount[]') updateBulkTotal();
+        });
+    });
+</script>
+
+<style>
+    @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeSlideOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-8px); height: 0; padding: 0; margin: 0; overflow: hidden; }
+    }
+    #bulkEntriesContainer::-webkit-scrollbar { width: 5px; }
+    #bulkEntriesContainer::-webkit-scrollbar-track { background: transparent; }
+    #bulkEntriesContainer::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 10px; }
+    .bulk-remove-btn:hover { background: var(--danger-bg) !important; }
+
+    /* Responsive: stack bulk row grid on smaller screens */
+    @media (max-width: 700px) {
+        #bulkEntriesContainer .bulk-expense-row > div:nth-child(2) {
+            grid-template-columns: 1fr 1fr !important;
+        }
+        #bulkEntriesContainer .bulk-expense-row > div:nth-child(3) {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
 
 <script>
     function selectExpenseCategory(el, category) {
