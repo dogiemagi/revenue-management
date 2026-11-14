@@ -1,0 +1,9 @@
+{
+  "name": "finflow",
+  "version": "2.0.0",
+  "description": "Personal finance manager: salary, spending, investments, growth planning, family workspace",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=22.13" },
+  "license": "MIT"
+}

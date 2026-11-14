@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FinFlow - Personal Finance</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side">
+    <div class="side-head">
+      <a class="brand" href="#/dashboard" title="FinFlow"><span class="logo" data-ic="trending-up"></span><span class="txt">FinFlow</span></a>
+      <button class="menu" id="collapse" aria-label="Hide or show sidebar" title="Hide / show sidebar" data-ic="panel-left"></button>
+    </div>
+    <nav id="nav">
+      <a href="#/dashboard" data-r="dashboard" title="Dashboard"><i data-ic="dashboard"></i><span class="txt">Dashboard</span></a>
+      <a href="#/salary" data-r="salary" title="Salary &amp; Budget"><i data-ic="wallet"></i><span class="txt">Salary &amp; Budget</span></a>
+      <a href="#/payslips" data-r="payslips" title="Pay Slips"><i data-ic="receipt"></i><span class="txt">Pay Slips</span></a>
+      <a href="#/spending" data-r="spending" title="Spending"><i data-ic="arrows"></i><span class="txt">Spending</span></a>
+      <a href="#/invest" data-r="invest" title="Investments"><i data-ic="pie"></i><span class="txt">Investments</span></a>
+      <a href="#/growth" data-r="growth" title="Growth Planner"><i data-ic="trending-up"></i><span class="txt">Growth Planner</span></a>
+      <a href="#/family" data-r="family" title="Family"><i data-ic="users"></i><span class="txt">Family</span></a>
+    </nav>
+    <div class="side-foot">
+      <div class="who" id="who"></div>
+      <label class="lbl cur">Currency
+        <select id="cur"><option value="INR">₹ INR</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option></select>
+      </label>
+      <button class="btn ghost" id="theme" title="Toggle theme"><i data-ic="sun" id="themeic"></i><span class="txt">Theme</span></button>
+      <button class="btn ghost danger" id="reset" title="Reset demo data" hidden><i data-ic="rotate"></i><span class="txt">Reset demo data</span></button>
+      <button class="btn ghost" id="logout" title="Sign out"><i data-ic="logout"></i><span class="txt">Sign out</span></button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <button class="menu" id="menu" aria-label="Hide or show sidebar" title="Hide / show sidebar" data-ic="panel-left"></button>
+      <h1 id="title"></h1>
+      <div class="quick">
+        <a class="btn" href="#/spending?add=1"><i data-ic="plus"></i>Expense</a>
+        <a class="btn primary" href="#/invest?add=1"><i data-ic="plus"></i>Investment</a>
+      </div>
+    </header>
+    <section id="view"></section>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
