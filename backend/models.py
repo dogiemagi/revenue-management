@@ -99,6 +99,18 @@ class Transaction(Base):
         return {"id": self.id, "date": self.date, "desc": self.description, "cat": self.cat, "amount": self.amount, "kind": self.kind}
 
 
+class Category(Base):
+    """User-defined spending categories; `bucket` says whether it counts as a need or a want in the budget plan."""
+    __tablename__ = "categories"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = _uid()
+    name: Mapped[str] = mapped_column(String(30))
+    bucket: Mapped[str] = mapped_column(String(10), default="wants")
+
+    def dict(self):
+        return {"id": self.id, "name": self.name, "bucket": self.bucket}
+
+
 class Goal(Base):
     __tablename__ = "goals"
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -1,6 +1,7 @@
 """FinFlow API (FastAPI). Run: uvicorn backend.main:app  — also serves the HTML/JS frontend from /public."""
 import csv
 import html
+import re
 import io
 import os
 from pathlib import Path
@@ -17,8 +18,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import services as svc
 from .calc import calculate
-from .models import Family, Goal, Holding, Payslip, SessionLocal, Transaction, User, init_db
-from .schemas import (FamilyCreate, FamilyJoin, GoalIn, HoldingBulk, HoldingIn, HoldingPatch, LoginIn, PayslipIn, ProfileIn,
+from .models import Category, Family, Goal, Holding, Payslip, SessionLocal, Transaction, User, init_db
+from .schemas import (CATS, CategoryIn, FamilyCreate, FamilyJoin, GoalIn, HoldingBulk, HoldingIn, HoldingPatch, LoginIn, PayslipIn, ProfileIn,
                       RegisterIn, SettingsIn, TxBulk, TxIn)
 from .security import check_pw, hash_pw, limited, make_token, read_token, SESSION_DAYS
 
@@ -256,6 +257,33 @@ app.delete("/api/goals/{id_}", tags=["goals"])(_delete(Goal))
 app.delete("/api/payslips/{id_}", tags=["payslips"])(_delete(Payslip))
 
 
+# ---------- categories ----------
+NAME_OK = re.compile(r"^[\w &/'+.,()-]{1,30}$")
+
+
+def allowed_categories(db: Session, user: User) -> set:
+    return set(CATS) | {c.name for c in db.scalars(select(Category).where(Category.user_id == user.id))}
+
+
+@app.post("/api/categories", tags=["spending"])
+def add_category(body: CategoryIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    name = body.name
+    if not NAME_OK.match(name) or name == "__new__":
+        raise bad("Invalid category name")
+    mine = db.scalars(select(Category).where(Category.user_id == user.id)).all()
+    if len(mine) >= 30:
+        raise bad("You can have up to 30 custom categories")
+    if name.lower() in {n.lower() for n in allowed_categories(db, user)}:
+        raise bad("That category already exists")
+    c = Category(user_id=user.id, name=name, bucket=body.bucket)
+    db.add(c)
+    db.commit()
+    return c.dict()
+
+
+app.delete("/api/categories/{id_}", tags=["spending"])(_delete(Category))
+
+
 # ---------- transactions ----------
 def _tx(user_id: int, b: TxIn) -> Transaction:
     return Transaction(user_id=user_id, date=b.date, description=b.desc, cat=b.cat, amount=b.amount, kind=b.kind)
@@ -263,6 +291,8 @@ def _tx(user_id: int, b: TxIn) -> Transaction:
 
 @app.post("/api/transactions", tags=["spending"])
 def add_tx(body: TxIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if body.cat not in allowed_categories(db, user):
+        raise bad("Invalid category")
     t = _tx(user.id, body)
     db.add(t)
     db.commit()
@@ -274,6 +304,8 @@ def edit_tx(id_: int, body: TxIn, user: User = Depends(current_user), db: Sessio
     t = _owned(db, Transaction, id_, user)
     if not t:
         raise bad("Not found", 404)
+    if body.cat not in allowed_categories(db, user) and body.cat != t.cat:   # keep an old (since deleted) category editable
+        raise bad("Invalid category")
     t.date, t.description, t.cat, t.amount, t.kind = body.date, body.desc, body.cat, body.amount, body.kind
     db.commit()
     return t.dict()
@@ -281,7 +313,11 @@ def edit_tx(id_: int, body: TxIn, user: User = Depends(current_user), db: Sessio
 
 @app.post("/api/transactions/bulk", tags=["spending"])
 def add_tx_bulk(body: TxBulk, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    rows = [_tx(user.id, b) for b in body.items]   # all validated by pydantic first -> all-or-nothing
+    allowed = allowed_categories(db, user)
+    for i, b in enumerate(body.items):
+        if b.cat not in allowed:
+            raise bad(f"Row {i + 1}: Invalid category")
+    rows = [_tx(user.id, b) for b in body.items]   # all validated first -> all-or-nothing
     db.add_all(rows)
     db.commit()
     return {"items": [t.dict() for t in rows]}

@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .calc import calculate
-from .models import Family, Goal, Holding, Payslip, Setting, Transaction, User
+from .models import Category, Family, Goal, Holding, Payslip, Setting, Transaction, User
 from .security import hash_pw
 
 
@@ -68,6 +68,7 @@ def full_state(db: Session, user: User) -> dict:
         "holdings": [h.dict() for h in _rows(db, Holding, user.id, Holding.id)],
         "tx": [t.dict() for t in _rows(db, Transaction, user.id, Transaction.date.desc(), Transaction.id.desc())],
         "goals": [g.dict() for g in _rows(db, Goal, user.id, Goal.date)],
+        "categories": [c.dict() for c in _rows(db, Category, user.id, Category.id)],
         "payslips": [p.dict() for p in _rows(db, Payslip, user.id, Payslip.pay_date.desc(), Payslip.id.desc())],
         "family": family_view(db, user),
     }

@@ -52,9 +52,14 @@ class LoginIn(Form):
 class TxIn(Form):
     date: Day
     desc: Name
-    cat: Literal[tuple(CATS)]
+    cat: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]   # built-in or user category, checked in the route
     amount: Positive
     kind: Literal["expense", "income"] = "expense"
+
+
+class CategoryIn(Form):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]
+    bucket: Literal["needs", "wants"] = "wants"
 
 
 class TxBulk(Form):

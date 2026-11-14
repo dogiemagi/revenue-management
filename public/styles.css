@@ -225,3 +225,12 @@ body:not(.authed) .foot{width:min(1040px,92vw);margin-top:0}
 .tour-pop::before,.mbox::before{display:none}
 @media(pointer:coarse),(prefers-reduced-motion:reduce){.cur-ring,.cur-ripple{display:none}.card::before{display:none}}
 .card:not(.tour-pop){position:relative}
+/* custom categories */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);font-size:13px}
+.chip small{color:var(--mut);text-transform:capitalize}
+.chip button{border:0;background:transparent;color:var(--mut);cursor:pointer;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;padding:0}
+.chip button:hover{color:var(--bad);background:rgba(239,68,68,.12)}
+.chip button .ic{width:13px;height:13px}
+#catmodal{z-index:75}
+.toast{z-index:5000}

@@ -89,6 +89,10 @@ const monthTotal = (m, kind) => sum(S.tx.filter(t => t.kind === kind && ym(t.dat
 const slipIncome = m => sum(S.payslips.filter(p => ym(p.pay_date) === m), p => p.net);
 const monthIncome = m => slipIncome(m) + monthTotal(m, 'income');   // only what the user has logged: pay slips + extra income
 const cashBalance = () => S.cash + sum(S.payslips, p => p.net) + sum(S.tx.filter(t => t.kind === 'income'), t => t.amount) - sum(S.tx.filter(t => t.kind === 'expense'), t => t.amount);
+const customCats = () => S.categories || [];
+const allCats = () => [...Object.keys(CATS), ...customCats().map(c => c.name)];
+const bucketOf = c => CATS[c] || (customCats().find(x => x.name === c) || {}).bucket || 'wants';
+const catOptions = (selected, withNew = true) => allCats().map(c => `<option ${c === selected ? 'selected' : ''}>${esc(c)}</option>`).join('') + (withNew ? '<option value="__new__">+ Add new category…</option>' : '');
 const hasData = ms => ms.some(m => monthIncome(m.ym) || monthTotal(m.ym, 'expense'));
 const emptyBox = (icon, title, text, href, label) => `<div class="emptyx"><span class="pi">${ic(icon)}</span><b>${title}</b><span>${text}</span>${href ? `<a class="btn sm primary" href="${href}">${label}</a>` : ''}</div>`;
 const portfolio = () => ({inv: sum(S.holdings, h => h.invested), cur: sum(S.holdings, h => h.current), sip: sum(S.holdings, h => h.sip)});
@@ -177,7 +181,7 @@ pages.dashboard = () => {
   const ms = lastMonths(6);
   const byType = {}; S.holdings.forEach(h => byType[h.type] = (byType[h.type] || 0) + h.current);
   const proj = project(p.cur, sip, S.growth.ret ?? blended(), 10, S.growth.step, S.growth.infl);
-  const needs = sum(S.tx.filter(t => t.kind === 'expense' && ym(t.date) === curYM && CATS[t.cat] === 'needs'), t => t.amount);
+  const needs = sum(S.tx.filter(t => t.kind === 'expense' && ym(t.date) === curYM && bucketOf(t.cat) === 'needs'), t => t.amount);
   const wants = exp - needs, N = net();
   const tips = [];
   if (!N) tips.push(['info', 'Add your salary details on the <a href="#/salary"><b>Salary</b></a> page to unlock your full dashboard.']);
@@ -235,7 +239,7 @@ function calcOut(c) {
 pages.salary = () => {
   const pr = S.profile, N = net(), a = S.alloc, inv = 100 - a.needs - a.wants;
   const exp = monthTotal(curYM, 'expense');
-  const needs = sum(S.tx.filter(t => t.kind === 'expense' && ym(t.date) === curYM && CATS[t.cat] === 'needs'), t => t.amount);
+  const needs = sum(S.tx.filter(t => t.kind === 'expense' && ym(t.date) === curYM && bucketOf(t.cat) === 'needs'), t => t.amount);
   const wants = exp - needs, sip = portfolio().sip;
   const row = (name, planned, actual) => `<div style="margin-bottom:14px"><div class="row"><b>${name}</b><span class="mut">${fmt(actual)} / ${fmt(planned)}</span></div>${bar(actual, planned, actual > planned ? 'bad' : 'ok')}</div>`;
   return `
@@ -302,7 +306,7 @@ const bulkRow = (kind = 'expense', date = iso(new Date())) => `<div class="brow"
   <select name="k" aria-label="Type"><option value="expense" ${kind === 'expense' ? 'selected' : ''}>Expense</option><option value="income" ${kind === 'income' ? 'selected' : ''}>Extra income</option></select>
   <input name="t" type="date" value="${date}" aria-label="Date">
   <input name="d" placeholder="e.g. Groceries" maxlength="120" aria-label="Description">
-  <select name="c" aria-label="Category">${Object.keys(CATS).map(c => `<option>${c}</option>`).join('')}</select>
+  <select name="c" aria-label="Category" data-cat>${catOptions()}</select>
   <input name="a" type="number" min="0.01" step="any" placeholder="0.00" aria-label="Amount">
   <button type="button" class="btn sm danger" data-act="delrow" aria-label="Remove row" title="Remove row">${ic('x')}</button></div>`;
 function parseBulk(f) {
@@ -331,7 +335,7 @@ pages.spending = () => {
       <label class="lbl">Type<select name="kind"><option value="expense">Expense</option><option value="income">Extra income</option></select></label>
       <label class="lbl">Date<input name="date" type="date" value="${iso(new Date())}" required></label>
       <label class="lbl">Description<input name="desc" placeholder="e.g. Groceries" required maxlength="120"></label>
-      <label class="lbl">Category<select name="cat">${Object.keys(CATS).map(c => `<option>${c}</option>`).join('')}</select></label>
+      <label class="lbl">Category<select name="cat" data-cat>${catOptions()}</select></label>
       <label class="lbl">Amount<input name="amount" type="number" min="0.01" step="any" required></label>
       <button class="btn primary">Add</button>
     </div></form>
@@ -343,8 +347,11 @@ pages.spending = () => {
       <textarea name="paste" rows="4" placeholder="Milk and eggs, Groceries, 240&#10;2026-11-03, Metro card, Transport, 500" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:inherit;width:100%"></textarea></label>
     <div class="row" style="justify-content:flex-start;margin-top:14px"><button class="btn primary">Add all</button><span class="mut" id="bulkinfo" style="font-size:13px"></span></div>
   </form>
+  <div class="card" style="margin-top:16px"><h3>Your categories <button type="button" class="btn sm primary" data-act="newcat">${ic('plus')} Add category</button></h3>
+    <div class="mut" style="font-size:13px;margin-bottom:10px">Create your own, like Pets or Subscriptions. They appear in every Category dropdown. You can also add one right from a dropdown.</div>
+    <div class="chips" id="catchips">${customCats().length ? customCats().map(c => `<span class="chip">${esc(c.name)} <small>${c.bucket}</small><button type="button" data-act="delcat" data-id="${c.id}" aria-label="Delete category ${esc(c.name)}" title="Delete">${ic('x')}</button></span>`).join('') : '<span class="mut">None yet. Built-in categories are always available.</span>'}</div></div>
   <div class="card" style="margin-top:16px"><h3>Transactions
-    <select id="fcat" style="width:auto"><option>All</option>${Object.keys(CATS).map(c => `<option ${c === spendFilter ? 'selected' : ''}>${c}</option>`).join('')}</select></h3>${txTable(list, true)}</div>`;
+    <select id="fcat" style="width:auto"><option>All</option>${allCats().map(c => `<option ${c === spendFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></h3>${txTable(list, true)}</div>`;
 };
 
 pages.invest = () => {
@@ -485,7 +492,7 @@ const adopt = state => { S = state; sortTx(); sortSlips(); go('#/dashboard'); };
 const EDIT = {
   tx: {title: 'Edit transaction', url: '/api/transactions/', list: () => S.tx, sort: sortTx, fields: [
     ['kind', 'Type', 'select', [['expense', 'Expense'], ['income', 'Extra income']]], ['date', 'Date', 'date'], ['desc', 'Description', 'text'],
-    ['cat', 'Category', 'select', Object.keys(CATS).map(c => [c, c])], ['amount', 'Amount', 'number']]},
+    ['cat', 'Category', 'select', () => [...allCats().map(c => [c, c]), ['__new__', '+ Add new category…']]], ['amount', 'Amount', 'number']]},
   holding: {title: 'Edit investment', url: '/api/holdings/', list: () => S.holdings, fields: [
     ['name', 'Name', 'text'], ['type', 'Type', 'select', TYPES.map(t => [t, t])], ['invested', 'Amount invested', 'number'], ['current', 'Current value', 'number'], ['sip', 'Monthly SIP', 'number']]},
   goal: {title: 'Edit goal', url: '/api/goals/', list: () => S.goals, sort: () => S.goals.sort((a, b) => a.date.localeCompare(b.date)), fields: [
@@ -499,9 +506,14 @@ const closeEdit = () => { const m = $('#modal'); if (m) m.remove(); editing = nu
 function openEdit(kind, id) {
   const spec = EDIT[kind], rec = spec.list().find(r => same(r.id, id)); if (!rec) return;
   closeEdit(); editing = {kind, id};
-  const field = ([n, l, t, o]) => t === 'select'
-    ? `<label class="lbl">${l}<select name="${n}">${o.map(([v, x]) => `<option value="${esc(v)}" ${v === rec[n] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`
-    : `<label class="lbl">${l}<input name="${n}" type="${t}" ${t === 'number' ? 'min="0" step="any"' : ''} value="${esc(rec[n] ?? '')}" ${n === 'notes' ? '' : 'required'}></label>`;
+  const field = ([n, l, t, o]) => {
+    if (t === 'select') {
+      let opts = typeof o === 'function' ? o() : o;
+      if (!opts.some(([v]) => v === rec[n])) opts = [[rec[n], rec[n]], ...opts];   // keep a value even if its category was deleted
+      return `<label class="lbl">${l}<select name="${n}" ${n === 'cat' ? 'data-cat' : ''}>${opts.map(([v, x]) => `<option value="${esc(v)}" ${v === rec[n] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`;
+    }
+    return `<label class="lbl">${l}<input name="${n}" type="${t}" ${t === 'number' ? 'min="0" step="any"' : ''} value="${esc(rec[n] ?? '')}" ${n === 'notes' ? '' : 'required'}></label>`;
+  };
   document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="modal"><form class="card mbox" data-form="edit"><h3>${spec.title}<button type="button" class="btn sm ghost" data-act="closemodal" aria-label="Close">${ic('x')}</button></h3>
     <div class="form">${spec.fields.map(field).join('')}</div>
     <div class="row" style="justify-content:flex-end;margin-top:18px"><button type="button" class="btn" data-act="closemodal">Cancel</button><button class="btn primary">Save changes</button></div></form></div>`);
@@ -516,6 +528,32 @@ function openContribute(id) {
     <label class="lbl">Amount to add<input name="amount" type="number" min="0.01" step="any" required placeholder="e.g. 5000"></label>
     <div class="row" style="justify-content:flex-end;margin-top:18px"><button type="button" class="btn" data-act="closemodal">Cancel</button><button class="btn primary">Add to goal</button></div></form></div>`);
   setTimeout(() => { const i = $('#modal input'); if (i) i.focus(); }, 60);
+}
+
+// ---------- custom categories ----------
+let catTarget = null;
+const closeCat = () => { const m = $('#catmodal'); if (m) m.remove(); };
+function askNewCategory(sel) {
+  catTarget = sel || null; closeCat();
+  document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="catmodal"><form class="card mbox" data-form="newcat" style="width:min(420px,100%)"><h3>New category<button type="button" class="btn sm ghost" data-act="closecat" aria-label="Close">${ic('x')}</button></h3>
+    <div class="stack"><label class="lbl">Name<input name="name" required maxlength="30" autocomplete="off" placeholder="e.g. Pets, Subscriptions, Gifts"></label>
+    <label class="lbl">Counts toward<select name="bucket"><option value="needs">Needs (rent, bills, food)</option><option value="wants" selected>Wants (fun, shopping)</option></select></label></div>
+    <div class="err" id="caterr" style="margin-top:8px"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button type="button" class="btn" data-act="closecat">Cancel</button><button class="btn primary">Add category</button></div></form></div>`);
+  setTimeout(() => { const i = $('#catmodal input'); if (i) i.focus(); }, 60);
+}
+function addCategoryEverywhere(name, target) {   // refresh every category dropdown on screen without losing typed data
+  document.querySelectorAll('select[data-cat]').forEach(s => {
+    if (![...s.options].some(o => o.value === name)) { const o = new Option(name, name), nw = [...s.options].find(x => x.value === '__new__'); s.add(o, nw || null); }
+    if (s === target) s.value = name;
+    if (s._cs) s._cs.sync();
+  });
+  const f = $('#fcat'); if (f && ![...f.options].some(o => o.value === name)) { f.add(new Option(name, name)); if (f._cs) f._cs.sync(); }
+}
+function renderCatChips() {
+  const el = $('#catchips'); if (!el) return;
+  el.innerHTML = customCats().length ? customCats().map(c => `<span class="chip">${esc(c.name)} <small>${c.bucket}</small><button type="button" data-act="delcat" data-id="${c.id}" aria-label="Delete category ${esc(c.name)}" title="Delete">${ic('x')}</button></span>`).join('')
+    : '<span class="mut">None yet. Built-in categories are always available.</span>';
 }
 
 // ---------- first-login tour (ends by asking for the salary) ----------
@@ -597,19 +635,22 @@ document.addEventListener('submit', async e => {
       case 'payslip': { const r = await api('POST', '/api/payslips', d); S.payslips.push(r); sortSlips(); toast('Pay slip added'); route(); break; }
       case 'edit': { const spec = EDIT[editing.kind], r = await api('PUT', spec.url + editing.id, d), arr = spec.list(), i = arr.findIndex(x => same(x.id, editing.id)); if (i >= 0) arr[i] = r; if (spec.sort) spec.sort(); closeEdit(); toast('Changes saved'); route(); break; }
       case 'contribute': { const g = S.goals.find(x => same(x.id, editing.id)), r = await api('PUT', '/api/goals/' + g.id, {name: g.name, target: g.target, saved: g.saved + num(d.amount), date: g.date}); S.goals[S.goals.indexOf(g)] = r; closeEdit(); flashGoal = r.id; toast(`Added ${fmt(num(d.amount))} to ${r.name}. Now ${fmt(r.saved)} of ${fmt(r.target)}`); route(); flashGoal = null; break; }
+      case 'newcat': { const r = await api('POST', '/api/categories', {name: d.name, bucket: d.bucket}); (S.categories = S.categories || []).push(r); addCategoryEverywhere(r.name, catTarget); renderCatChips(); closeCat(); toast(`Category "${r.name}" added`); break; }
       case 'tourfinish': { const r = await api('PUT', '/api/profile', {...S.profile, pay_frequency: d.pay_frequency, base_salary: d.base_salary, tax_rate: d.tax_rate || 0, cash: d.cash || 0}); S.profile = r.profile; S.calc = r.calc; S.cash = r.cash; await endTour(); toast('You are all set'); go('#/dashboard'); break; }
       case 'famcreate': S.family = (await api('POST', '/api/family/create', d)).family; toast('Family created'); route(); break;
       case 'famjoin': S.family = (await api('POST', '/api/family/join', d)).family; toast('Joined family'); route(); break;
     }
   } catch (err) {
+    if (f.dataset.form === 'newcat') { const ce = $('#caterr'); if (ce) ce.textContent = err.message; if (btn) btn.disabled = false; return; }
     const el = $(f.dataset.form === 'register' ? '#autherr2' : '#autherr');
     if (el && !S) el.textContent = err.message; else fail(err);
     if (btn) btn.disabled = false;
   }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal') && !openCS) closeEdit(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !openCS) { if ($('#catmodal')) closeCat(); else if ($('#modal')) closeEdit(); } });
 document.addEventListener('click', async e => {
   if (e.target.id === 'modal') { closeEdit(); return; }
+  if (e.target.id === 'catmodal') { closeCat(); return; }
   const t = e.target.closest('[data-tab]');
   if (t) { document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b === t)); $('form[data-form=login]').hidden = t.dataset.tab !== 'login'; $('form[data-form=register]').hidden = t.dataset.tab !== 'register'; return; }
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -623,6 +664,9 @@ document.addEventListener('click', async e => {
       case 'demo': adopt(await api('POST', '/api/demo')); return;
       case 'edit': openEdit(b.dataset.kind, id); return;
       case 'addmoney': openContribute(id); return;
+      case 'newcat': askNewCategory(null); return;
+      case 'closecat': closeCat(); return;
+      case 'delcat': if (!confirm('Delete this category? Existing transactions keep its name.')) return; await api('DELETE', '/api/categories/' + id); S.categories = customCats().filter(x => !same(x.id, id)); break;
       case 'closemodal': closeEdit(); return;
       case 'tournext': if (tour && tour.i < TOUR.length - 1) { tour.i++; renderTour(); } return;
       case 'tourback': if (tour && tour.i > 0) { tour.i--; renderTour(); } return;
@@ -716,6 +760,7 @@ function enhanceSelect(sel) {
   };
   const choose = i => {
     if (i < 0 || i >= sel.options.length) return;
+    if (sel.options[i].value === '__new__') { closeCS(); askNewCategory(sel); return; }
     const changed = sel.selectedIndex !== i; sel.selectedIndex = i; closeCS(); render();
     if (changed) { sel.dispatchEvent(new Event('input', {bubbles: true})); sel.dispatchEvent(new Event('change', {bubbles: true})); }
     btn.focus();

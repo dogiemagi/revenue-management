@@ -228,3 +228,36 @@ def test_onboarded_flag_persists(make_client):
     assert c.get("/api/state").json()["onboarded"] is False
     c.put("/api/settings", json={"onboarded": True})
     assert c.get("/api/state").json()["onboarded"] is True
+
+def test_custom_categories(asha, bob):
+    r = asha.post("/api/categories", json={"name": "Pets", "bucket": "needs"})
+    assert r.status_code == 200 and r.json()["name"] == "Pets" and r.json()["bucket"] == "needs"
+    cid = r.json()["id"]
+    assert any(c["name"] == "Pets" for c in state(asha)["categories"])
+    assert state(bob)["categories"] == []                                              # private to each user
+    # rules: no duplicates (case-insensitive), no built-in clash, sane names
+    assert asha.post("/api/categories", json={"name": "pets"}).status_code == 400
+    assert asha.post("/api/categories", json={"name": "rent"}).status_code == 400
+    assert asha.post("/api/categories", json={"name": "__new__"}).status_code == 400
+    assert asha.post("/api/categories", json={"name": "<script>"}).status_code == 400
+    assert asha.post("/api/categories", json={"name": "x" * 31}).status_code == 400
+    # usable in single, bulk and edit; unknown ones are rejected; other users can't use it
+    base = {"date": "2026-03-01", "desc": "Dog food", "amount": 40}
+    t = asha.post("/api/transactions", json={**base, "cat": "Pets"})
+    assert t.status_code == 200 and t.json()["cat"] == "Pets"
+    assert bob.post("/api/transactions", json={**base, "cat": "Pets"}).status_code == 400
+    assert asha.post("/api/transactions", json={**base, "cat": "Nonsense"}).status_code == 400
+    b = asha.post("/api/transactions/bulk", json={"items": [{**base, "cat": "Pets"}, {**base, "cat": "Groceries"}]})
+    assert b.status_code == 200 and len(b.json()["items"]) == 2
+    bad = asha.post("/api/transactions/bulk", json={"items": [{**base, "cat": "Pets"}, {**base, "cat": "Ghost"}]})
+    assert bad.status_code == 400 and bad.json()["error"] == "Row 2: Invalid category"
+    assert asha.put(f"/api/transactions/{t.json()['id']}", json={**base, "cat": "Dining"}).status_code == 200
+    # deleting a category keeps old transactions intact and editable
+    assert bob.delete(f"/api/categories/{cid}").status_code == 200 and any(c["name"] == "Pets" for c in state(asha)["categories"])
+    asha.delete(f"/api/categories/{cid}")
+    assert state(asha)["categories"] == []
+    kept = [x for x in state(asha)["tx"] if x["cat"] == "Pets"]
+    assert len(kept) == 1
+    assert asha.put(f"/api/transactions/{kept[0]['id']}", json={**base, "cat": "Pets", "amount": 41}).status_code == 200
+    for x in state(asha)["tx"]:
+        asha.delete(f"/api/transactions/{x['id']}")
