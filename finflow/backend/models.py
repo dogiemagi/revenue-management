@@ -1,9 +1,10 @@
 """SQLAlchemy models + engine. SQLite by default; set DATABASE_URL for Postgres etc."""
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text, create_engine, event, text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, MetaData, String, Text, create_engine, event, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -11,8 +12,19 @@ DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 
 DATABASE_URL = os.environ.get("DATABASE_URL") or f"sqlite:///{os.environ.get('DB_FILE') or DATA / 'finflow.db'}"
+# Neon/Render hand out postgres:// or postgresql:// URLs; use the psycopg 3 driver
+DATABASE_URL = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", DATABASE_URL)
 _sqlite = DATABASE_URL.startswith("sqlite")
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if _sqlite else {})
+# On Postgres all tables live in their own schema so FinFlow can share a database with another app
+# (e.g. a different project that also has `users` / `families` tables) without clashing.
+SCHEMA = None if _sqlite else os.environ.get("DB_SCHEMA", "finflow")
+_t = lambda name: f"{SCHEMA}.{name}" if SCHEMA else name  # noqa: E731
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if _sqlite else {},
+    **({} if _sqlite else {"pool_pre_ping": True, "pool_recycle": 300}),   # serverless Postgres drops idle connections
+)
 
 if _sqlite:
     @event.listens_for(engine, "connect")
@@ -26,11 +38,11 @@ SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
-    pass
+    metadata = MetaData(schema=SCHEMA)
 
 
-_now = text("CURRENT_TIMESTAMP")
-_uid = lambda: mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)  # noqa: E731
+_now = func.now()
+_uid = lambda: mapped_column(Integer, ForeignKey(_t("users.id"), ondelete="CASCADE"), nullable=False, index=True)  # noqa: E731
 
 
 class Family(Base):
@@ -38,7 +50,7 @@ class Family(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(60))
     invite_code: Mapped[str] = mapped_column(String(20), unique=True)
-    created_at: Mapped[Optional[str]] = mapped_column(String, server_default=_now)
+    created_at: Mapped[Optional[object]] = mapped_column(DateTime, server_default=_now)
 
 
 class User(Base):
@@ -47,15 +59,15 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(80))
     email: Mapped[str] = mapped_column(String(120), unique=True)
     pass_hash: Mapped[str] = mapped_column(String(255))
-    family_id: Mapped[Optional[int]] = mapped_column(ForeignKey("families.id", ondelete="SET NULL"))
+    family_id: Mapped[Optional[int]] = mapped_column(ForeignKey(_t("families.id"), ondelete="SET NULL"))
     is_family_admin: Mapped[int] = mapped_column(Integer, default=0)
     is_demo: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[Optional[str]] = mapped_column(String, server_default=_now)
+    created_at: Mapped[Optional[object]] = mapped_column(DateTime, server_default=_now)
 
 
 class Setting(Base):
     __tablename__ = "settings"
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey(_t("users.id"), ondelete="CASCADE"), primary_key=True)
     json: Mapped[str] = mapped_column(Text)
 
 
@@ -123,4 +135,7 @@ class Payslip(Base):
 
 
 def init_db():
+    if SCHEMA:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
     Base.metadata.create_all(engine)
