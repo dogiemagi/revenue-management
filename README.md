@@ -1,4 +1,4 @@
-﻿# FinFlow
+# FinFlow
 
 Full-stack personal finance manager: salary engine, pay slips, spending, investments, growth planning and a family workspace.
 
@@ -39,14 +39,14 @@ tests/          pytest end-to-end API tests
 ```
 
 ## Deploy: Render (web service) + Neon (Postgres)
-FinFlow lives in the `finflow/` subfolder of this repo, so give it **its own Render web service** (don't change the service that runs the Flask app at the repo root).
+The app lives at the root of this repo, so no Root Directory is needed.
 
 1. Render → **New + → Web Service** → pick this GitHub repo.
 2. Settings:
 
 | Field | Value |
 |---|---|
-| Root Directory | `finflow` |
+| Root Directory | *(leave blank)* |
 | Runtime | Python 3 |
 | Build Command | `pip install -r requirements.txt` |
 | Start Command | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'` |
