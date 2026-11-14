@@ -40,6 +40,7 @@ def test_register_and_session(asha):
     s = state(asha)
     assert s["user"]["name"] == "Asha" and s["user"]["demo"] is False
     assert s["profile"]["pay_frequency"] == "monthly" and s["calc"]["monthly"]["net"] == 0
+    assert s["onboarded"] is False and s["profile"]["tax_rate"] == 0 and s["profile"]["pension_rate"] == 0
 
 
 def test_duplicate_email_and_bad_login(make_client, asha):
@@ -189,3 +190,41 @@ def test_static_frontend_and_safety(make_client, asha):
 def test_openapi_docs_available(make_client):
     r = make_client().get("/openapi.json")
     assert r.status_code == 200 and "/api/transactions/bulk" in r.json()["paths"]
+
+
+def test_blank_tax_and_pension_mean_zero(asha):
+    """What you enter is what you get: blank deductions must not silently become 15% / 6%."""
+    r = asha.post("/api/calc", json={"pay_frequency": "monthly", "base_salary": "44800", "tax_rate": "", "pension_rate": ""}).json()
+    assert r["monthly"]["net"] == 44800 and r["monthly"]["total_deductions"] == 0
+
+
+def test_edit_endpoints(asha, bob):
+    tx = asha.post("/api/transactions", json={"date": "2026-02-01", "desc": "Old", "cat": "Rent", "amount": 10}).json()
+    e = asha.put(f"/api/transactions/{tx['id']}", json={"date": "2026-02-02", "desc": "New", "cat": "Dining", "amount": 25, "kind": "income"})
+    assert e.status_code == 200 and (e.json()["desc"], e.json()["cat"], e.json()["amount"], e.json()["kind"]) == ("New", "Dining", 25, "income")
+    assert bob.put(f"/api/transactions/{tx['id']}", json={"date": "2026-02-02", "desc": "Hack", "cat": "Rent", "amount": 1}).status_code == 404
+    assert asha.put(f"/api/transactions/{tx['id']}", json={"date": "2026-02-02", "desc": "x", "cat": "Rent", "amount": 0}).status_code == 400
+
+    h = asha.post("/api/holdings", json={"name": "H", "type": "Gold", "invested": 100}).json()
+    e = asha.put(f"/api/holdings/{h['id']}", json={"name": "H2", "type": "ETF", "invested": 200, "current": 260, "sip": 5}).json()
+    assert (e["name"], e["type"], e["invested"], e["current"], e["sip"]) == ("H2", "ETF", 200, 260, 5)
+    assert bob.put(f"/api/holdings/{h['id']}", json={"name": "x", "type": "ETF", "invested": 1}).status_code == 404
+
+    g = asha.post("/api/goals", json={"name": "G", "target": 100, "date": "2030-01-01"}).json()
+    e = asha.put(f"/api/goals/{g['id']}", json={"name": "G2", "target": 500, "saved": 50, "date": "2031-01-01"}).json()
+    assert (e["name"], e["target"], e["saved"], e["date"]) == ("G2", 500, 50, "2031-01-01")
+
+    p = asha.post("/api/payslips", json={"title": "P", "pay_date": "2026-04-01", "gross": 1000, "tax": 100}).json()
+    e = asha.put(f"/api/payslips/{p['id']}", json={"title": "P2", "pay_date": "2026-04-02", "category": "bonus", "gross": 2000, "tax": 300, "pension": 100}).json()
+    assert (e["title"], e["gross"], e["net"], e["category"]) == ("P2", 2000, 1600, "bonus")
+    assert bob.put(f"/api/payslips/{p['id']}", json={"title": "x", "pay_date": "2026-04-02", "gross": 1}).status_code == 404
+    for kind, i in (("transactions", tx["id"]), ("holdings", h["id"]), ("goals", g["id"]), ("payslips", p["id"])):
+        asha.delete(f"/api/{kind}/{i}")
+
+
+def test_onboarded_flag_persists(make_client):
+    c = make_client()
+    c.post("/api/register", json={"name": "Newbie", "email": "newbie@x.com", "password": PW})
+    assert c.get("/api/state").json()["onboarded"] is False
+    c.put("/api/settings", json={"onboarded": True})
+    assert c.get("/api/state").json()["onboarded"] is True

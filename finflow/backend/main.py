@@ -163,6 +163,8 @@ def put_settings(body: SettingsIn, user: User = Depends(current_user), db: Sessi
         s["theme"] = body.theme
     if body.cash is not None:
         s["cash"] = body.cash
+    if body.onboarded is not None:
+        s["onboarded"] = body.onboarded
     if body.alloc:
         s["alloc"] = body.alloc.model_dump()
     if body.growth:
@@ -216,6 +218,17 @@ def _owned(db: Session, model, id_: int, user: User):
     return row if row and row.user_id == user.id else None
 
 
+@app.put("/api/holdings/{id_}", tags=["investments"])
+def edit_holding(id_: int, body: HoldingIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    h = _owned(db, Holding, id_, user)
+    if not h:
+        raise bad("Not found", 404)
+    h.name, h.type, h.invested, h.sip = body.name, body.type, body.invested, body.sip
+    h.current = body.invested if body.current is None else body.current
+    db.commit()
+    return h.dict()
+
+
 @app.patch("/api/holdings/{id_}", tags=["investments"])
 def patch_holding(id_: int, body: HoldingPatch, user: User = Depends(current_user), db: Session = Depends(get_db)):
     h = _owned(db, Holding, id_, user)
@@ -256,6 +269,16 @@ def add_tx(body: TxIn, user: User = Depends(current_user), db: Session = Depends
     return t.dict()
 
 
+@app.put("/api/transactions/{id_}", tags=["spending"])
+def edit_tx(id_: int, body: TxIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    t = _owned(db, Transaction, id_, user)
+    if not t:
+        raise bad("Not found", 404)
+    t.date, t.description, t.cat, t.amount, t.kind = body.date, body.desc, body.cat, body.amount, body.kind
+    db.commit()
+    return t.dict()
+
+
 @app.post("/api/transactions/bulk", tags=["spending"])
 def add_tx_bulk(body: TxBulk, user: User = Depends(current_user), db: Session = Depends(get_db)):
     rows = [_tx(user.id, b) for b in body.items]   # all validated by pydantic first -> all-or-nothing
@@ -273,9 +296,18 @@ def add_goal(body: GoalIn, user: User = Depends(current_user), db: Session = Dep
     return g.dict()
 
 
+@app.put("/api/goals/{id_}", tags=["goals"])
+def edit_goal(id_: int, body: GoalIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    g = _owned(db, Goal, id_, user)
+    if not g:
+        raise bad("Not found", 404)
+    g.name, g.target, g.saved, g.date = body.name, body.target, body.saved, body.date
+    db.commit()
+    return g.dict()
+
+
 # ---------- pay slips ----------
-@app.post("/api/payslips", tags=["payslips"])
-def add_payslip(body: PayslipIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def _slip_fields(body: PayslipIn, user: User, db: Session) -> dict:
     if body.fromProfile:
         s = svc.slip_from_profile(svc.get_settings(db, user.id)["profile"], body.pay_date, body.title or "Salary", body.category)
     else:
@@ -287,8 +319,24 @@ def add_payslip(body: PayslipIn, user: User = Depends(current_user), db: Session
         s = {"title": body.title, "pay_date": body.pay_date, "category": body.category, "gross": body.gross, "allowances": body.allowances,
              "tax": body.tax, "pension": body.pension, "insurance": body.insurance, "other": body.other, "net": net}
     s["notes"] = body.notes[:500]
-    p = Payslip(user_id=user.id, **s)
+    return s
+
+
+@app.post("/api/payslips", tags=["payslips"])
+def add_payslip(body: PayslipIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    p = Payslip(user_id=user.id, **_slip_fields(body, user, db))
     db.add(p)
+    db.commit()
+    return p.dict()
+
+
+@app.put("/api/payslips/{id_}", tags=["payslips"])
+def edit_payslip(id_: int, body: PayslipIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    p = _owned(db, Payslip, id_, user)
+    if not p:
+        raise bad("Not found", 404)
+    for k, v in _slip_fields(body, user, db).items():
+        setattr(p, k, v)
     db.commit()
     return p.dict()
 

@@ -103,8 +103,8 @@ class ProfileIn(Form):
     base_salary: Money = 0
     allowances: Money = 0
     bonus_expected: Money = 0
-    tax_rate: Percent(70) = 15
-    pension_rate: Percent(50) = 6
+    tax_rate: Percent(70) = 0
+    pension_rate: Percent(50) = 0
     insurance_deduction: Money = 0
     other_deductions: Money = 0
     standard_hours_per_week: Annotated[float, Field(ge=1, le=100)] = 40
@@ -137,6 +137,7 @@ class SettingsIn(Form):
     cash: Optional[Money] = None
     alloc: Optional[Alloc] = None
     growth: Optional[Growth] = None
+    onboarded: Optional[bool] = None
 
 
 class FamilyCreate(Form):

@@ -41,6 +41,8 @@ const ICONS = {
   'shield': '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
   'layers': '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
   'target': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  'edit': '<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>',
+  'help': '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   'lock': '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   'eye': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -48,6 +50,7 @@ const ICONS = {
 };
 const ic = n => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 const TIPC = {alert: 'var(--warn)', 'check-circle': 'var(--ok)'};
+const editBtn = (kind, id) => `<button type="button" class="btn sm" data-act="edit" data-kind="${kind}" data-id="${id}" title="Edit" aria-label="Edit">${ic('edit')}</button>`;
 const hydrateIcons = () => document.querySelectorAll('[data-ic]').forEach(el => { el.innerHTML = ic(el.dataset.ic); });
 
 // ---------- API ----------
@@ -83,7 +86,11 @@ const curYM = ym(iso(new Date()));
 const net = () => S.calc.monthly.net;
 const sum = (a, f) => a.reduce((t, x) => t + f(x), 0);
 const monthTotal = (m, kind) => sum(S.tx.filter(t => t.kind === kind && ym(t.date) === m), t => t.amount);
-const monthIncome = m => net() + monthTotal(m, 'income');
+const slipIncome = m => sum(S.payslips.filter(p => ym(p.pay_date) === m), p => p.net);
+const monthIncome = m => slipIncome(m) + monthTotal(m, 'income');   // only what the user has logged: pay slips + extra income
+const cashBalance = () => S.cash + sum(S.payslips, p => p.net) + sum(S.tx.filter(t => t.kind === 'income'), t => t.amount) - sum(S.tx.filter(t => t.kind === 'expense'), t => t.amount);
+const hasData = ms => ms.some(m => monthIncome(m.ym) || monthTotal(m.ym, 'expense'));
+const emptyBox = (icon, title, text, href, label) => `<div class="emptyx"><span class="pi">${ic(icon)}</span><b>${title}</b><span>${text}</span>${href ? `<a class="btn sm primary" href="${href}">${label}</a>` : ''}</div>`;
 const portfolio = () => ({inv: sum(S.holdings, h => h.invested), cur: sum(S.holdings, h => h.current), sip: sum(S.holdings, h => h.sip)});
 const blended = () => { const p = portfolio(); return p.cur ? sum(S.holdings, h => h.current * RET[h.type]) / p.cur : 10; };
 const lastMonths = n => Array.from({length: n}, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - (n - 1 - i)); return {ym: iso(d).slice(0, 7), label: d.toLocaleString('en', {month: 'short'})}; });
@@ -165,7 +172,7 @@ pages.auth = () => `
 
 pages.dashboard = () => {
   const p = portfolio(), gain = p.cur - p.inv, gp = p.inv ? gain / p.inv * 100 : 0;
-  const nw = p.cur + S.cash, inc = monthIncome(curYM), exp = monthTotal(curYM, 'expense');
+  const cash = cashBalance(), nw = p.cur + cash, inc = monthIncome(curYM), exp = monthTotal(curYM, 'expense');
   const sip = p.sip, saved = inc - exp, rate = inc ? saved / inc * 100 : 0;
   const ms = lastMonths(6);
   const byType = {}; S.holdings.forEach(h => byType[h.type] = (byType[h.type] || 0) + h.current);
@@ -174,30 +181,33 @@ pages.dashboard = () => {
   const wants = exp - needs, N = net();
   const tips = [];
   if (!N) tips.push(['info', 'Add your salary details on the <a href="#/salary"><b>Salary</b></a> page to unlock your full dashboard.']);
+  else if (!inc) tips.push(['info', 'Log your latest <a href="#/payslips"><b>pay slip</b></a> so income and savings reflect what you actually earned.']);
   else if (rate < 20) tips.push(['alert', `Savings rate is ${rate.toFixed(0)}% — aim for 20%+. Trim "wants" or raise your SIP.`]);
   else tips.push(['check-circle', `Great! You save ${rate.toFixed(0)}% of income this month.`]);
   if (N && wants > N * S.alloc.wants / 100) tips.push(['bag', `Wants spending (${fmt(wants)}) is above your ${S.alloc.wants}% target.`]);
-  if (exp && S.cash < exp * 6) tips.push(['shield', `Emergency cash covers ${(S.cash / exp).toFixed(1)} months; target 6.`]);
+  if (exp && cash < exp * 6) tips.push(['shield', `Emergency cash covers ${(Math.max(cash, 0) / exp).toFixed(1)} months; target 6.`]);
   const maxType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
   if (maxType && maxType[1] / p.cur > .5) tips.push(['layers', `${Math.round(maxType[1] / p.cur * 100)}% of your portfolio is in ${esc(maxType[0])} — consider diversifying.`]);
   if (!S.family) tips.push(['users', 'Manage household income together in the <a href="#/family"><b>Family</b></a> workspace.']);
   const recent = S.tx.slice(0, 5);
+  const banner = !N ? `<div class="card setup"><span class="pi">${ic('wallet')}</span><div><b>Add your salary to personalise FinFlow</b><div class="mut">Your take-home, budget plan and projections are all built from it.</div></div><a class="btn primary" href="#/salary">Set up salary</a></div>` : '';
   return `
+  ${banner}
   <div class="grid g4">
-    <a class="card kpi hero" href="#/invest"><div class="l">Net worth</div><div class="v">${fmt(nw)}</div><div class="s">Portfolio ${fmt(p.cur, 1)} + cash ${fmt(S.cash, 1)}</div></a>
+    <a class="card kpi hero" href="#/invest" title="Cash = starting balance + income logged - spending logged"><div class="l">Net worth</div><div class="v">${fmt(nw)}</div><div class="s">Portfolio ${fmt(p.cur, 1)} + cash ${fmt(cash, 1)}</div></a>
     <a class="card kpi" href="#/salary"><div class="l">Monthly take-home</div><div class="v">${fmt(N)}</div><div class="s mut">Retains ${S.calc.rates.retention}% of gross</div></a>
     <a class="card kpi" href="#/invest"><div class="l">Total returns</div><div class="v ${gain >= 0 ? 'up' : 'down'}">${fmt(gain)}</div><div class="s ${gain >= 0 ? 'up' : 'down'}">${pct(gp)} on ${fmt(p.inv, 1)}</div></a>
-    <a class="card kpi" href="#/spending"><div class="l">Savings rate (this month)</div><div class="v ${rate >= 20 ? 'up' : 'down'}">${rate.toFixed(0)}%</div><div class="s mut">Spent ${fmt(exp)} of ${fmt(inc)}</div></a>
+    <a class="card kpi" href="#/spending"><div class="l">Savings rate (this month)</div><div class="v ${inc ? (rate >= 20 ? 'up' : 'down') : ''}">${inc ? rate.toFixed(0) + '%' : '—'}</div><div class="s mut">${inc ? `Spent ${fmt(exp)} of ${fmt(inc)}` : 'Log a pay slip to see this'}</div></a>
   </div>
   <div class="grid g21" style="margin-top:16px">
-    <div class="card"><h3>Income vs spending <a href="#/spending">Details →</a></h3>${barChart(ms.map(m => m.label), [{name: 'Income', color: '#22c55e', pts: ms.map(m => monthIncome(m.ym))}, {name: 'Spending', color: '#ef4444', pts: ms.map(m => monthTotal(m.ym, 'expense'))}])}</div>
+    <div class="card"><h3>Income vs spending <a href="#/spending">Details →</a></h3>${hasData(ms) ? barChart(ms.map(m => m.label), [{name: 'Income', color: '#22c55e', pts: ms.map(m => monthIncome(m.ym))}, {name: 'Spending', color: '#ef4444', pts: ms.map(m => monthTotal(m.ym, 'expense'))}]) : emptyBox('receipt', 'No data yet', 'Log a pay slip or an expense and your monthly income and spending will appear here.', '#/payslips', 'Add a pay slip')}</div>
     <div class="card"><h3>Portfolio mix <a href="#/invest">Manage →</a></h3>${S.holdings.length ? donut(Object.entries(byType).map(([k, v], i) => ({label: k, value: v, color: COLORS[i % 8]})), ['Portfolio', fmt(p.cur, 1)]) : '<div class="empty">No investments yet</div>'}</div>
   </div>
   <div class="grid g21" style="margin-top:16px">
-    <div class="card"><h3>10-year growth outlook <a href="#/growth">Open planner →</a></h3>${lineChart(proj.map(x => 'Y' + x.y), [{name: 'Projected value', color: '#6366f1', pts: proj.map(x => x.v)}, {name: 'Money invested', color: '#f59e0b', pts: proj.map(x => x.inv), dash: 1}])}</div>
+    <div class="card"><h3>10-year growth outlook <a href="#/growth">Open planner →</a></h3>${(p.cur || sip) ? lineChart(proj.map(x => 'Y' + x.y), [{name: 'Projected value', color: '#6366f1', pts: proj.map(x => x.v)}, {name: 'Money invested', color: '#f59e0b', pts: proj.map(x => x.inv), dash: 1}]) : emptyBox('trending-up', 'Nothing to project yet', 'Add an investment or a monthly SIP and your 10-year outlook will appear here.', '#/invest?add=1', 'Add an investment')}</div>
     <div class="stack">
       <div class="card"><h3>Smart insights</h3>${tips.map(t => `<div class="tip"><span style="color:${TIPC[t[0]] || 'var(--pri)'}">${ic(t[0])}</span><span>${t[1]}</span></div>`).join('')}</div>
-      <div class="card"><h3>Goals <a href="#/growth">Edit →</a></h3>${S.goals.map(g => `<div style="margin-bottom:10px"><div class="row"><span>${esc(g.name)}</span><span class="mut">${Math.round(g.saved / g.target * 100)}%</span></div>${bar(g.saved, g.target)}</div>`).join('') || '<div class="empty">No goals</div>'}</div>
+      <div class="card"><h3>Goals <a href="#/growth">Edit →</a></h3>${S.goals.map(g => `<div style="margin-bottom:10px"><div class="row"><span>${esc(g.name)}</span><span class="mut">${Math.min(100, pct1(g.saved, g.target))}% · ${fmt(g.saved, 1)}</span></div>${bar(g.saved, g.target)}</div>`).join('') || '<div class="empty">No goals</div>'}</div>
     </div>
   </div>
   <div class="card" style="margin-top:16px"><h3>Recent transactions <a href="#/spending">All →</a></h3>${txTable(recent, false)}</div>`;
@@ -205,13 +215,14 @@ pages.dashboard = () => {
 
 function txTable(list, del) {
   if (!list.length) return '<div class="empty">No transactions</div>';
-  return `<div class="tbl"><table><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th>${del ? '<th></th>' : ''}</tr>${list.map(t => `<tr><td>${t.date}</td><td>${esc(t.desc)}</td><td><span class="pill">${esc(t.cat)}</span></td><td style="text-align:right" class="${t.kind === 'income' ? 'up' : ''}">${t.kind === 'income' ? '+' : '−'}${fmt(t.amount)}</td>${del ? `<td><button class="btn sm danger" data-act="deltx" data-id="${t.id}">${ic('x')}</button></td>` : ''}</tr>`).join('')}</table></div>`;
+  return `<div class="tbl"><table><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th>${del ? '<th></th>' : ''}</tr>${list.map(t => `<tr><td>${t.date}</td><td>${esc(t.desc)}</td><td><span class="pill">${esc(t.cat)}</span></td><td style="text-align:right" class="${t.kind === 'income' ? 'up' : ''}">${t.kind === 'income' ? '+' : '−'}${fmt(t.amount)}</td>${del ? `<td>${editBtn('tx', t.id)} <button class="btn sm danger" data-act="deltx" data-id="${t.id}">${ic('x')}</button></td>` : ''}</tr>`).join('')}</table></div>`;
 }
 
 function calcOut(c) {
   const m = c.monthly;
   const rows = [['Yearly', c.yearly], ['Monthly', c.monthly], ['Bi-weekly', c.biweekly], ['Weekly', c.weekly], ['Daily', c.daily]];
   return `
+    <div class="tip" style="margin-bottom:12px"><span>${ic('info')}</span><span>${fmt(m.gross)} gross per month → <b>${fmt(m.net)}</b> take-home${m.total_deductions ? ` after ${fmt(m.total_deductions)} of deductions (tax ${fmt(m.tax)}, pension ${fmt(m.pension)}, insurance ${fmt(m.insurance)}, other ${fmt(m.other)})` : ', because no deductions are entered'}.</span></div>
     <div class="grid g2" style="margin-bottom:12px">
       <div class="card kpi" style="padding:12px"><div class="l">Monthly net</div><div class="v up">${fmt(m.net)}</div></div>
       <div class="card kpi" style="padding:12px"><div class="l">Yearly net</div><div class="v">${fmt(c.yearly.net, 1)}</div></div>
@@ -232,9 +243,10 @@ pages.salary = () => {
     <form class="card" id="pform" data-form="profile"><h3>Salary profile <span class="pill">amounts are per pay period</span></h3>
       <div class="form">
         <label class="lbl">Pay frequency<select name="pay_frequency">${FREQS.map(([v, l]) => `<option value="${v}" ${v === pr.pay_frequency ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        ${PF.map(([k, l]) => `<label class="lbl">${l}<input name="${k}" type="number" min="0" step="any" value="${pr[k]}"></label>`).join('')}
-        <label class="lbl">Cash savings balance<input name="cash" type="number" min="0" value="${S.cash}"></label>
+        ${PF.map(([k, l]) => `<label class="lbl">${l}<input name="${k}" type="number" min="0" step="any" placeholder="${k === 'standard_hours_per_week' ? '40' : k === 'overtime_rate_multiplier' ? '1.5' : '0'}" value="${pr[k]}"></label>`).join('')}
+        <label class="lbl">Starting cash balance<input name="cash" type="number" min="0" step="any" placeholder="0" value="${S.cash}"></label>
       </div>
+      <div class="mut" style="margin-top:12px;font-size:13px;line-height:1.5">Tax % and Pension % are <b>subtracted</b> from your salary to get take-home. Leave them at 0 if the amount you entered is already after deductions. Starting cash is what you have in the bank today; income and spending you log are added to it automatically.</div>
       <button class="btn primary" style="margin-top:14px">Save &amp; view dashboard →</button>
     </form>
     <div class="card"><h3>Live breakdown</h3><div id="calcout">${calcOut(S.calc)}</div></div>
@@ -282,7 +294,7 @@ pages.payslips = () => {
     <div class="row" style="justify-content:flex-start;margin-top:14px"><button class="btn primary">Add pay slip</button><button type="button" class="btn" data-act="slipgen">${ic('zap')} Generate from my salary profile</button></div>
   </form>
   <div class="card" style="margin-top:16px"><h3>Pay slips <a class="btn sm" href="/api/payslips/export.csv" download>${ic('download')} Export CSV</a></h3>
-    ${list.length ? `<div class="tbl"><table><tr><th>Date</th><th>Title</th><th>Category</th><th>Gross</th><th>Deductions</th><th>Net</th><th></th></tr>${list.map(p => `<tr><td>${p.pay_date}</td><td>${esc(p.title)}</td><td><span class="pill">${esc(catName(p.category))}</span></td><td>${fmt(p.gross)}</td><td>${fmt(p.tax + p.pension + p.insurance + p.other)}</td><td class="up">${fmt(p.net)}</td><td style="white-space:nowrap"><a class="btn sm" href="/print/${p.id}" target="_blank" rel="noopener">${ic('printer')} Print</a> <button class="btn sm danger" data-act="delslip" data-id="${p.id}">${ic('x')}</button></td></tr>`).join('')}</table></div>` : '<div class="empty">No pay slips yet</div>'}
+    ${list.length ? `<div class="tbl"><table><tr><th>Date</th><th>Title</th><th>Category</th><th>Gross</th><th>Deductions</th><th>Net</th><th></th></tr>${list.map(p => `<tr><td>${p.pay_date}</td><td>${esc(p.title)}</td><td><span class="pill">${esc(catName(p.category))}</span></td><td>${fmt(p.gross)}</td><td>${fmt(p.tax + p.pension + p.insurance + p.other)}</td><td class="up">${fmt(p.net)}</td><td style="white-space:nowrap"><a class="btn sm" href="/print/${p.id}" target="_blank" rel="noopener">${ic('printer')} Print</a> ${editBtn('slip', p.id)} <button class="btn sm danger" data-act="delslip" data-id="${p.id}">${ic('x')}</button></td></tr>`).join('')}</table></div>` : '<div class="empty">No pay slips yet</div>'}
   </div>`;
 };
 
@@ -311,7 +323,7 @@ pages.spending = () => {
   const list = S.tx.filter(t => spendFilter === 'All' || t.cat === spendFilter).slice(0, 60);
   return `
   <div class="grid g21">
-    <div class="card"><h3>Monthly spending trend</h3>${barChart(ms.map(m => m.label), [{name: 'Spending', color: '#ec4899', pts: ms.map(m => monthTotal(m.ym, 'expense'))}, {name: 'Income', color: '#22c55e', pts: ms.map(m => monthIncome(m.ym))}])}</div>
+    <div class="card"><h3>Monthly spending trend</h3>${hasData(ms) ? barChart(ms.map(m => m.label), [{name: 'Spending', color: '#ec4899', pts: ms.map(m => monthTotal(m.ym, 'expense'))}, {name: 'Income', color: '#22c55e', pts: ms.map(m => monthIncome(m.ym))}]) : emptyBox('arrows', 'No spending logged yet', 'Add your first expense below and your monthly trend will appear here.')}</div>
     <div class="card"><h3>This month by category</h3>${Object.keys(cats).length ? donut(Object.entries(cats).map(([k, v], i) => ({label: k, value: v, color: COLORS[i % 8]})), ['Spent', fmt(cm, 1)]) : '<div class="empty">No spending yet</div>'}</div>
   </div>
   <form class="card" id="addtx" data-form="tx" style="margin-top:16px"><h3>Add transaction</h3>
@@ -346,7 +358,7 @@ pages.invest = () => {
   </div>
   <div class="grid g21" style="margin-top:16px">
     <div class="card"><h3>Holdings <a href="#/growth">See growth projection →</a></h3>
-      ${S.holdings.length ? `<div class="tbl"><table><tr><th>Name</th><th>Type</th><th>Invested</th><th>Current value</th><th>Return</th><th>SIP/mo</th><th></th></tr>${S.holdings.map(h => { const g = h.invested ? (h.current - h.invested) / h.invested * 100 : 0; return `<tr><td>${esc(h.name)}</td><td><span class="pill">${esc(h.type)}</span></td><td>${fmt(h.invested)}</td><td><input type="number" min="0" value="${h.current}" data-edit="${h.id}" title="Update current value"></td><td class="${g >= 0 ? 'up' : 'down'}">${pct(g)}</td><td>${fmt(h.sip)}</td><td><button class="btn sm danger" data-act="delh" data-id="${h.id}">${ic('x')}</button></td></tr>`; }).join('')}</table></div>` : '<div class="empty">Add your first investment below</div>'}
+      ${S.holdings.length ? `<div class="tbl"><table><tr><th>Name</th><th>Type</th><th>Invested</th><th>Current value</th><th>Return</th><th>SIP/mo</th><th></th></tr>${S.holdings.map(h => { const g = h.invested ? (h.current - h.invested) / h.invested * 100 : 0; return `<tr><td>${esc(h.name)}</td><td><span class="pill">${esc(h.type)}</span></td><td>${fmt(h.invested)}</td><td><input type="number" min="0" value="${h.current}" data-edit="${h.id}" title="Update current value"></td><td class="${g >= 0 ? 'up' : 'down'}">${pct(g)}</td><td>${fmt(h.sip)}</td><td>${editBtn('holding', h.id)} <button class="btn sm danger" data-act="delh" data-id="${h.id}">${ic('x')}</button></td></tr>`; }).join('')}</table></div>` : '<div class="empty">Add your first investment below</div>'}
     </div>
     <div class="card"><h3>Allocation</h3>${S.holdings.length ? donut(Object.entries(byType).map(([k, v], i) => ({label: k, value: v, color: COLORS[i % 8]})), ['Total', fmt(p.cur, 1)]) : '<div class="empty">—</div>'}</div>
   </div>
@@ -387,12 +399,17 @@ pages.growth = () => {
       <button class="btn primary">Add goal</button>
     </div></form>`;
 };
+let flashGoal = null;
+const pct1 = (a, b) => (b ? Math.round(a / b * 1000) / 10 : 0);
 function goalRow(x) {
-  const months = Math.max(1, Math.round((new Date(x.date) - new Date()) / 2.63e9));
-  const need = Math.max(0, (x.target - x.saved) / months);
-  return `<div><div class="row"><b>${esc(x.name)}</b><span class="mut">${fmt(x.saved, 1)} / ${fmt(x.target, 1)} · by ${x.date} · save ${fmt(need)}/mo <button type="button" class="btn sm danger" data-act="delg" data-id="${x.id}">${ic('x')}</button></span></div>${bar(x.saved, x.target, 'ok')}</div>`;
-}
-function growthOut() {
+  const left = Math.max(0, x.target - x.saved), pctDone = Math.min(100, pct1(x.saved, x.target));
+  const days = Math.ceil((new Date(x.date + 'T23:59:59') - new Date()) / 864e5), months = Math.max(1, Math.ceil(days / 30.4));
+  const status = left <= 0 ? '<span class="pill good">Reached</span>' : days < 0 ? '<span class="pill late">Past due</span>' : '';
+  const hint = left <= 0 ? 'Goal reached — well done.' : days < 0 ? `${fmt(left)} still to go.` : `${fmt(left)} to go · save about <b>${fmt(left / months)}</b> a month to finish by ${x.date}.`;
+  return `<div class="goal${same(flashGoal, x.id) ? ' flash' : ''}"><div class="row"><b>${esc(x.name)} ${status}</b>
+    <span class="gactions"><button type="button" class="btn sm primary" data-act="addmoney" data-id="${x.id}">${ic('plus')} Add money</button>${editBtn('goal', x.id)} <button type="button" class="btn sm danger" data-act="delg" data-id="${x.id}" title="Delete" aria-label="Delete">${ic('x')}</button></span></div>
+    <div class="gmeta">${fmt(x.saved)} of ${fmt(x.target)} (${pctDone}%) · due ${x.date}<br>${hint}</div>${bar(x.saved, x.target, left <= 0 ? 'ok' : '')}</div>`;
+}function growthOut() {
   const g = S.growth, p = portfolio();
   const monthly = g.monthly ?? p.sip, start = g.start ?? p.cur, ret = g.ret ?? +blended().toFixed(1);
   const years = Math.max(1, Math.min(50, g.years || 1));
@@ -458,10 +475,103 @@ function route() {
   if (path === 'growth') growthOut();
   if (qs && qs.includes('add=1')) { const t = path === 'spending' ? $('#addtx') : path === 'invest' ? $('#addh') : null; if (t) { t.scrollIntoView({behavior: 'smooth'}); const i = t.querySelector('input[name=desc],input[name=name]'); if (i) setTimeout(() => i.focus(), 400); } }
   else scrollTo(0, 0);
+  if (!S.onboarded && !tour) startTour();
 }
 const go = h => { if (location.hash === h) route(); else location.hash = h; };
 addEventListener('hashchange', route);
 const adopt = state => { S = state; sortTx(); sortSlips(); go('#/dashboard'); };
+
+// ---------- edit dialog ----------
+const EDIT = {
+  tx: {title: 'Edit transaction', url: '/api/transactions/', list: () => S.tx, sort: sortTx, fields: [
+    ['kind', 'Type', 'select', [['expense', 'Expense'], ['income', 'Extra income']]], ['date', 'Date', 'date'], ['desc', 'Description', 'text'],
+    ['cat', 'Category', 'select', Object.keys(CATS).map(c => [c, c])], ['amount', 'Amount', 'number']]},
+  holding: {title: 'Edit investment', url: '/api/holdings/', list: () => S.holdings, fields: [
+    ['name', 'Name', 'text'], ['type', 'Type', 'select', TYPES.map(t => [t, t])], ['invested', 'Amount invested', 'number'], ['current', 'Current value', 'number'], ['sip', 'Monthly SIP', 'number']]},
+  goal: {title: 'Edit goal', url: '/api/goals/', list: () => S.goals, sort: () => S.goals.sort((a, b) => a.date.localeCompare(b.date)), fields: [
+    ['name', 'Goal', 'text'], ['target', 'Target', 'number'], ['saved', 'Saved so far', 'number'], ['date', 'Target date', 'date']]},
+  slip: {title: 'Edit pay slip', url: '/api/payslips/', list: () => S.payslips, sort: sortSlips, fields: [
+    ['title', 'Title', 'text'], ['pay_date', 'Pay date', 'date'], ['category', 'Category', 'select', SLIP_CATS], ['gross', 'Gross', 'number'], ['allowances', 'Allowances (part of gross)', 'number'],
+    ['tax', 'Tax', 'number'], ['pension', 'Pension / PF', 'number'], ['insurance', 'Insurance', 'number'], ['other', 'Other deductions', 'number'], ['notes', 'Notes', 'text']]}
+};
+let editing = null;
+const closeEdit = () => { const m = $('#modal'); if (m) m.remove(); editing = null; };
+function openEdit(kind, id) {
+  const spec = EDIT[kind], rec = spec.list().find(r => same(r.id, id)); if (!rec) return;
+  closeEdit(); editing = {kind, id};
+  const field = ([n, l, t, o]) => t === 'select'
+    ? `<label class="lbl">${l}<select name="${n}">${o.map(([v, x]) => `<option value="${esc(v)}" ${v === rec[n] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`
+    : `<label class="lbl">${l}<input name="${n}" type="${t}" ${t === 'number' ? 'min="0" step="any"' : ''} value="${esc(rec[n] ?? '')}" ${n === 'notes' ? '' : 'required'}></label>`;
+  document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="modal"><form class="card mbox" data-form="edit"><h3>${spec.title}<button type="button" class="btn sm ghost" data-act="closemodal" aria-label="Close">${ic('x')}</button></h3>
+    <div class="form">${spec.fields.map(field).join('')}</div>
+    <div class="row" style="justify-content:flex-end;margin-top:18px"><button type="button" class="btn" data-act="closemodal">Cancel</button><button class="btn primary">Save changes</button></div></form></div>`);
+  setTimeout(() => { const i = $('#modal input'); if (i) i.focus(); }, 60);
+}
+
+function openContribute(id) {
+  const g = S.goals.find(x => same(x.id, id)); if (!g) return;
+  closeEdit(); editing = {kind: 'contribute', id};
+  document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="modal"><form class="card mbox" data-form="contribute" style="width:min(420px,100%)"><h3>Add money to ${esc(g.name)}<button type="button" class="btn sm ghost" data-act="closemodal" aria-label="Close">${ic('x')}</button></h3>
+    <p class="mut" style="margin:0 0 14px">Saved so far ${fmt(g.saved)} of ${fmt(g.target)}. Enter what you are setting aside now; it is added to the saved amount.</p>
+    <label class="lbl">Amount to add<input name="amount" type="number" min="0.01" step="any" required placeholder="e.g. 5000"></label>
+    <div class="row" style="justify-content:flex-end;margin-top:18px"><button type="button" class="btn" data-act="closemodal">Cancel</button><button class="btn primary">Add to goal</button></div></form></div>`);
+  setTimeout(() => { const i = $('#modal input'); if (i) i.focus(); }, 60);
+}
+
+// ---------- first-login tour (ends by asking for the salary) ----------
+const TOUR = [
+  {t: 'Welcome to FinFlow', d: 'A 30-second tour, then we will set up your salary so every chart and total reflects your own money.'},
+  {r: 'dashboard', t: 'Dashboard', d: 'Net worth, savings rate and trends. Everything here is built only from what you record.'},
+  {r: 'salary', t: 'Salary & Budget', d: 'Enter your pay and deductions once. See take-home per week, month and year, and split it into needs, wants and investing.'},
+  {r: 'payslips', t: 'Pay Slips', d: 'Log each pay slip you receive. Your income charts and cash balance are built from these. Print or export any time.'},
+  {r: 'spending', t: 'Spending', d: 'Add expenses one at a time or in bulk. You can edit or delete any entry later.'},
+  {r: 'invest', t: 'Investments', d: 'Track holdings, returns and monthly SIPs. Edit values whenever they change.'},
+  {r: 'growth', t: 'Growth Planner', d: 'Project your wealth under three scenarios and set savings goals.'},
+  {r: 'family', t: 'Family', d: 'Create a household with an invite code to see combined income. Only salary totals are shared.'},
+  {final: true}
+];
+let tour = null, tourWasCollapsed = false;
+function startTour() {
+  if (tour || !S) return;
+  tour = {i: 0};
+  const app = $('#app'); tourWasCollapsed = app.classList.contains('collapsed'); app.classList.remove('collapsed');
+  if (location.hash !== '#/dashboard') location.hash = '#/dashboard';
+  document.body.insertAdjacentHTML('beforeend', '<div id="tour"><div class="tour-block"></div><div class="tour-dim"></div><div class="tour-hole"></div><div class="tour-pop card" role="dialog" aria-modal="true"></div></div>');
+  renderTour();
+}
+async function endTour() {
+  try { await api('PUT', '/api/settings', {onboarded: true}); } catch {}
+  S.onboarded = true;
+  const t = $('#tour'); if (t) t.remove();
+  tour = null; if (tourWasCollapsed) $('#app').classList.add('collapsed');
+}
+function renderTour() {
+  if (!tour) return;
+  const s = TOUR[tour.i], pop = $('#tour .tour-pop'), hole = $('#tour .tour-hole'), dim = $('#tour .tour-dim');
+  const dots = TOUR.map((_, i) => `<i class="${i === tour.i ? 'on' : ''}"></i>`).join('');
+  if (s.final) {
+    const pr = S.profile;
+    pop.innerHTML = `<div class="tour-step">Last step</div><h3>Set up your salary</h3>
+      <p>Tell us what you earn so your dashboard shows your own numbers. You can change this any time on the Salary page.</p>
+      <form data-form="tourfinish" class="stack"><div class="form" style="grid-template-columns:1fr 1fr">
+        <label class="lbl">Pay frequency<select name="pay_frequency">${FREQS.map(([v, l]) => `<option value="${v}" ${v === pr.pay_frequency ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="lbl">Salary (before tax)<input name="base_salary" type="number" min="0" step="any" required placeholder="e.g. 50000" value="${pr.base_salary || ''}"></label>
+        <label class="lbl">Tax % (0 if already deducted)<input name="tax_rate" type="number" min="0" max="70" step="any" placeholder="0" value="${pr.tax_rate || ''}"></label>
+        <label class="lbl">Savings in bank today<input name="cash" type="number" min="0" step="any" placeholder="0" value="${S.cash || ''}"></label></div>
+        <div class="tour-dots">${dots}</div>
+        <div class="row"><button type="button" class="btn ghost sm" data-act="tourskip">Skip for now</button><button class="btn primary">Finish &amp; open dashboard</button></div></form>`;
+  } else {
+    pop.innerHTML = `<div class="tour-step">${tour.i + 1} of ${TOUR.length}</div><h3>${s.t}</h3><p>${s.d}</p><div class="tour-dots">${dots}</div>
+      <div class="row"><button type="button" class="btn ghost sm" data-act="tourskip">Skip tour</button><span class="row" style="gap:8px">${tour.i ? '<button type="button" class="btn sm" data-act="tourback">Back</button>' : ''}<button type="button" class="btn primary sm" data-act="tournext">${tour.i ? 'Next' : 'Start tour'}</button></span></div>`;
+  }
+  const target = s.r && innerWidth > 760 ? $(`#nav a[data-r="${s.r}"]`) : null;
+  if (target) {
+    const r = target.getBoundingClientRect();
+    hole.style.cssText = `display:block;left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px`; dim.style.display = 'none';
+    pop.style.cssText = `left:${Math.min(r.right + 22, innerWidth - pop.offsetWidth - 12)}px;top:${Math.max(12, Math.min(r.top - 8, innerHeight - pop.offsetHeight - 12))}px;transform:none`;
+  } else { hole.style.display = 'none'; dim.style.display = 'block'; pop.style.cssText = ''; }
+}
+addEventListener('resize', () => { if (tour) renderTour(); });
 
 // ---------- events ----------
 document.addEventListener('submit', async e => {
@@ -485,6 +595,9 @@ document.addEventListener('submit', async e => {
       case 'holding': { const r = await api('POST', '/api/holdings', d); S.holdings.push(r); toast('Investment added'); go('#/growth'); break; }
       case 'goal': { const r = await api('POST', '/api/goals', d); S.goals.push(r); S.goals.sort((a, b) => a.date.localeCompare(b.date)); toast('Goal added'); route(); break; }
       case 'payslip': { const r = await api('POST', '/api/payslips', d); S.payslips.push(r); sortSlips(); toast('Pay slip added'); route(); break; }
+      case 'edit': { const spec = EDIT[editing.kind], r = await api('PUT', spec.url + editing.id, d), arr = spec.list(), i = arr.findIndex(x => same(x.id, editing.id)); if (i >= 0) arr[i] = r; if (spec.sort) spec.sort(); closeEdit(); toast('Changes saved'); route(); break; }
+      case 'contribute': { const g = S.goals.find(x => same(x.id, editing.id)), r = await api('PUT', '/api/goals/' + g.id, {name: g.name, target: g.target, saved: g.saved + num(d.amount), date: g.date}); S.goals[S.goals.indexOf(g)] = r; closeEdit(); flashGoal = r.id; toast(`Added ${fmt(num(d.amount))} to ${r.name}. Now ${fmt(r.saved)} of ${fmt(r.target)}`); route(); flashGoal = null; break; }
+      case 'tourfinish': { const r = await api('PUT', '/api/profile', {...S.profile, pay_frequency: d.pay_frequency, base_salary: d.base_salary, tax_rate: d.tax_rate || 0, cash: d.cash || 0}); S.profile = r.profile; S.calc = r.calc; S.cash = r.cash; await endTour(); toast('You are all set'); go('#/dashboard'); break; }
       case 'famcreate': S.family = (await api('POST', '/api/family/create', d)).family; toast('Family created'); route(); break;
       case 'famjoin': S.family = (await api('POST', '/api/family/join', d)).family; toast('Joined family'); route(); break;
     }
@@ -494,7 +607,9 @@ document.addEventListener('submit', async e => {
     if (btn) btn.disabled = false;
   }
 });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal') && !openCS) closeEdit(); });
 document.addEventListener('click', async e => {
+  if (e.target.id === 'modal') { closeEdit(); return; }
   const t = e.target.closest('[data-tab]');
   if (t) { document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b === t)); $('form[data-form=login]').hidden = t.dataset.tab !== 'login'; $('form[data-form=register]').hidden = t.dataset.tab !== 'register'; return; }
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -506,10 +621,16 @@ document.addEventListener('click', async e => {
       case 'addrow': { const last = $('#brows .brow:last-child'); $('#brows').insertAdjacentHTML('beforeend', bulkRow(last ? last.querySelector('[name=k]').value : 'expense', last ? last.querySelector('[name=t]').value : undefined)); return; }
       case 'delrow': b.closest('.brow').remove(); return;
       case 'demo': adopt(await api('POST', '/api/demo')); return;
-      case 'deltx': await api('DELETE', '/api/transactions/' + id); S.tx = S.tx.filter(x => !same(x.id, id)); break;
-      case 'delh': await api('DELETE', '/api/holdings/' + id); S.holdings = S.holdings.filter(x => !same(x.id, id)); break;
-      case 'delg': await api('DELETE', '/api/goals/' + id); S.goals = S.goals.filter(x => !same(x.id, id)); break;
-      case 'delslip': await api('DELETE', '/api/payslips/' + id); S.payslips = S.payslips.filter(x => !same(x.id, id)); break;
+      case 'edit': openEdit(b.dataset.kind, id); return;
+      case 'addmoney': openContribute(id); return;
+      case 'closemodal': closeEdit(); return;
+      case 'tournext': if (tour && tour.i < TOUR.length - 1) { tour.i++; renderTour(); } return;
+      case 'tourback': if (tour && tour.i > 0) { tour.i--; renderTour(); } return;
+      case 'tourskip': await endTour(); toast('You can retake the tour from the sidebar'); route(); return;
+      case 'deltx': if (!confirm('Delete this transaction? This cannot be undone.')) return; await api('DELETE', '/api/transactions/' + id); S.tx = S.tx.filter(x => !same(x.id, id)); break;
+      case 'delh': if (!confirm('Delete this investment? This cannot be undone.')) return; await api('DELETE', '/api/holdings/' + id); S.holdings = S.holdings.filter(x => !same(x.id, id)); break;
+      case 'delg': if (!confirm('Delete this goal? This cannot be undone.')) return; await api('DELETE', '/api/goals/' + id); S.goals = S.goals.filter(x => !same(x.id, id)); break;
+      case 'delslip': if (!confirm('Delete this pay slip? This cannot be undone.')) return; await api('DELETE', '/api/payslips/' + id); S.payslips = S.payslips.filter(x => !same(x.id, id)); break;
       case 'slipgen': { const f = $('#slipform'); const r = await api('POST', '/api/payslips', {fromProfile: true, title: f.title.value, pay_date: f.pay_date.value, category: f.category.value}); S.payslips.push(r); sortSlips(); toast('Pay slip generated'); break; }
       case 'leavefam': if (!confirm('Leave this family workspace?')) return; S.family = (await api('POST', '/api/family/leave')).family; break;
       case 'copycode': try { await navigator.clipboard.writeText(S.family.invite_code); toast('Code copied'); } catch { toast('Select the code and copy it manually', true); } return;
@@ -542,6 +663,7 @@ $('#cur').onchange = e => { S.currency = e.target.value; saveSettings(); route()
 const themeIcon = () => { $('#themeic').innerHTML = ic(S && S.theme === 'light' ? 'moon' : 'sun'); };
 $('#theme').onclick = () => { S.theme = S.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = S.theme; themeIcon(); saveSettings(); };
 $('#reset').onclick = async () => { if (confirm('Reset the demo account back to its sample data?')) { try { adopt(await api('POST', '/api/demo/reset')); toast('Demo data restored'); } catch (err) { fail(err); } } };
+$('#tourbtn').onclick = startTour;
 $('#logout').onclick = async () => { try { await api('POST', '/api/logout'); } catch {} S = null; location.hash = ''; route(); };
 // sidebar hide / show: collapses to an icon rail on desktop, slides in on mobile
 const appEl = $('#app');

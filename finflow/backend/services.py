@@ -13,10 +13,10 @@ from .security import hash_pw
 
 def default_settings() -> dict:
     return {
-        "currency": "INR", "theme": "dark", "cash": 0, "alloc": {"needs": 50, "wants": 30},
+        "currency": "INR", "theme": "dark", "cash": 0, "onboarded": False, "alloc": {"needs": 50, "wants": 30},
         "growth": {"years": 20, "step": 8, "infl": 5, "target": 10_000_000, "ret": None, "start": None, "monthly": None},
-        "profile": {"pay_frequency": "monthly", "base_salary": 0, "allowances": 0, "bonus_expected": 0, "tax_rate": 15,
-                    "pension_rate": 6, "insurance_deduction": 0, "other_deductions": 0, "standard_hours_per_week": 40,
+        "profile": {"pay_frequency": "monthly", "base_salary": 0, "allowances": 0, "bonus_expected": 0, "tax_rate": 0,
+                    "pension_rate": 0, "insurance_deduction": 0, "other_deductions": 0, "standard_hours_per_week": 40,
                     "overtime_hours": 0, "overtime_rate_multiplier": 1.5},
     }
 
@@ -27,6 +27,7 @@ def get_settings(db: Session, uid: int) -> dict:
     if not row:
         return d
     s = json.loads(row.json)
+    s.setdefault("onboarded", True)   # accounts that existed before the tour was introduced skip it
     return {**d, **s, "alloc": {**d["alloc"], **s.get("alloc", {})}, "growth": {**d["growth"], **s.get("growth", {})},
             "profile": {**d["profile"], **s.get("profile", {})}}
 
@@ -105,8 +106,9 @@ def seed_user(db: Session, uid: int) -> None:
 
     for model in (Holding, Transaction, Goal, Payslip):
         db.execute(delete(model).where(model.user_id == uid))
-    profile = {**default_settings()["profile"], "base_salary": 75000, "allowances": 12000, "bonus_expected": 5000, "insurance_deduction": 2500, "other_deductions": 1000}
-    put_settings(db, uid, {**default_settings(), "cash": 120000, "profile": profile})
+    profile = {**default_settings()["profile"], "base_salary": 75000, "allowances": 12000, "bonus_expected": 5000, "tax_rate": 15, "pension_rate": 6,
+               "insurance_deduction": 2500, "other_deductions": 1000}
+    put_settings(db, uid, {**default_settings(), "onboarded": True, "cash": 120000, "profile": profile})
     for name, typ, inv, cur, sip in [("Nifty 50 Index Fund", "Mutual Fund", 300000, 365000, 10000), ("Blue-chip Stocks", "Stocks", 150000, 186000, 3000),
                                      ("Gold ETF", "Gold", 80000, 92000, 2000), ("Fixed Deposit", "Fixed Deposit", 200000, 214000, 0), ("PPF", "PPF/EPF", 120000, 134000, 5000)]:
         db.add(Holding(user_id=uid, name=name, type=typ, invested=inv, current=cur, sip=sip))
@@ -132,13 +134,13 @@ def ensure_demo(db: Session) -> User:
         db.flush()
         if profile:
             d = default_settings()
-            put_settings(db, user.id, {**d, "profile": {**d["profile"], **profile}})
+            put_settings(db, user.id, {**d, "onboarded": True, "profile": {**d["profile"], **profile}})
         return user
 
     me = mk("Morgan (Demo)", "demo@finflow.local")
     seed_user(db, me.id)
-    p2 = mk("Alex Morgan", "alex@finflow.local", {"base_salary": 62000, "allowances": 8000, "bonus_expected": 3000, "insurance_deduction": 2000, "other_deductions": 800})
-    p3 = mk("Sam Morgan", "sam@finflow.local", {"base_salary": 30000, "allowances": 4000, "tax_rate": 10, "insurance_deduction": 1000})
+    p2 = mk("Alex Morgan", "alex@finflow.local", {"base_salary": 62000, "allowances": 8000, "bonus_expected": 3000, "tax_rate": 15, "pension_rate": 6, "insurance_deduction": 2000, "other_deductions": 800})
+    p3 = mk("Sam Morgan", "sam@finflow.local", {"base_salary": 30000, "allowances": 4000, "tax_rate": 10, "pension_rate": 6, "insurance_deduction": 1000})
     fam = Family(name="Morgan Household", invite_code="DEMO-2026")
     db.add(fam)
     db.flush()
